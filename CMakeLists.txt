@@ -100,13 +100,36 @@ endif()
 
 option(UA_ENABLE_PUBSUB "Enable publish/subscribe (experimental)" OFF)
 mark_as_advanced(UA_ENABLE_PUBSUB)
-option(UA_ENABLE_PUBSUB_DELTAFRAMES "Enable sending of delta frames with only the changes" ON)
+option(UA_ENABLE_PUBSUB_DELTAFRAMES "Enable sending of delta frames with only the changes" OFF)
 mark_as_advanced(UA_ENABLE_PUBSUB_DELTAFRAMES)
 option(UA_ENABLE_PUBSUB_INFORMATIONMODEL "Enable PubSub information model twin" OFF)
 mark_as_advanced(UA_ENABLE_PUBSUB_INFORMATIONMODEL)
 if(UA_ENABLE_PUBSUB_INFORMATIONMODEL)
     if(NOT UA_ENABLE_PUBSUB)
     message(FATAL_ERROR "PubSub information model representation cannot be used with disabled PubSub function.")
+    endif()
+endif()
+
+option(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT
+       "Use a custom implementation for the publish/subscribe (experimental)" OFF)
+mark_as_advanced(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT)
+
+option(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT_TSN
+       "Use a custom implementation for the publish/subscribe with TSN (experimental)" OFF)
+mark_as_advanced(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT_TSN)
+
+if(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT)
+    if(NOT UA_ENABLE_PUBSUB)
+    message(FATAL_ERROR "Custom publish interrupt cannot be used with PubSub function disabled")
+    endif()
+endif()
+
+if(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT_TSN)
+    if(NOT UA_ENABLE_PUBSUB)
+    message(FATAL_ERROR "Custom publish interrupt TSN cannot be used with PubSub function disabled")
+    endif()
+    if(NOT UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT)
+    message(FATAL_ERROR "Custom publish interrupt TSN cannot be used with custom publish interrupt PubSub function disabled")
     endif()
 endif()
 

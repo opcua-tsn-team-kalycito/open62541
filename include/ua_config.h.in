@@ -28,6 +28,10 @@ extern "C" {
 #cmakedefine UA_ENABLE_NODEMANAGEMENT
 #cmakedefine UA_ENABLE_SUBSCRIPTIONS
 #cmakedefine UA_ENABLE_PUBSUB
+/* For custom interrupt based publisher implementation */
+#cmakedefine UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT
+/* For custom interrupt based publisher implementation with TSN */
+#cmakedefine UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT_TSN
 #cmakedefine UA_ENABLE_PUBSUB_DELTAFRAMES
 #cmakedefine UA_ENABLE_PUBSUB_INFORMATIONMODEL
 #cmakedefine UA_ENABLE_ENCRYPTION
@@ -68,7 +72,7 @@ extern "C" {
 # include <stdint.h>
 # include <stdbool.h> /* C99 Boolean */
 # if defined(_WRS_KERNEL)
-# define UINT32_C(x) ((x) + (UINT32_MAX - UINT32_MAX)) 
+# define UINT32_C(x) ((x) + (UINT32_MAX - UINT32_MAX))
 # endif
 #else
 # include "ms_stdint.h"
@@ -316,7 +320,6 @@ extern "C" {
 #ifndef UA_BINARY_OVERLAYABLE_FLOAT
 # define UA_BINARY_OVERLAYABLE_FLOAT 0
 #endif
-
 #ifdef __cplusplus
 } // extern "C"
 #endif

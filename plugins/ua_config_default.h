@@ -1,9 +1,10 @@
 /* This work is licensed under a Creative Commons CCZero 1.0 Universal License.
- * See http://creativecommons.org/publicdomain/zero/1.0/ for more information. 
+ * See http://creativecommons.org/publicdomain/zero/1.0/ for more information.
  *
  *    Copyright 2017 (c) Fraunhofer IOSB (Author: Julius Pfrommer)
  *    Copyright 2017 (c) Stefan Profanter, fortiss GmbH
  *    Copyright 2018 (c) Mark Giraud, Fraunhofer IOSB
+ *    Copyright 2019 (c) Kalycito Infotech Private Limited
  */
 
 #ifndef UA_CONFIG_DEFAULT_H_
@@ -16,6 +17,7 @@ extern "C" {
 #include "ua_server.h"
 #include "ua_server_config.h"
 #include "ua_client.h"
+#include "ua_log_stdout.h"
 
 /**********************/
 /* Default Connection */
@@ -28,7 +30,7 @@ extern const UA_EXPORT UA_ConnectionConfig UA_ConnectionConfig_default;
 /*************************/
 
 /* Creates a new server config with one endpoint.
- * 
+ *
  * The config will set the tcp network layer to the given port and adds a single
  * endpoint with the security policy ``SecurityPolicy#None`` to the server. A
  * server certificate may be supplied but is optional.

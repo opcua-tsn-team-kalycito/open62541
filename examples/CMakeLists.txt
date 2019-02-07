@@ -3,6 +3,16 @@ include_directories(${PROJECT_SOURCE_DIR}/plugins)
 include_directories(${PROJECT_BINARY_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/examples)
 
+if(UA_ENABLE_PUBSUB)
+if(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT)
+include_directories(${PROJECT_SOURCE_DIR}/src/server/)
+include_directories(${PROJECT_SOURCE_DIR}/src)
+include_directories(${PROJECT_SOURCE_DIR}/src/pubsub)
+include_directories(${PROJECT_SOURCE_DIR}/deps)
+add_definitions(-D_GNU_SOURCE)
+endif()
+endif()
+
 set(examples_headers
     ${examples_headers}
     ${PROJECT_SOURCE_DIR}/examples/common.h
@@ -16,6 +26,13 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/examples)
 
 macro(add_example EXAMPLE_NAME EXAMPLE_SOURCE)
   add_executable(${EXAMPLE_NAME} ${STATIC_OBJECTS} ${EXAMPLE_SOURCE} ${ARGN} ${examples_headers})
+
+  if(UA_ENABLE_PUBSUB)
+  if(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT)
+     target_link_libraries(${EXAMPLE_NAME} open62541 ${open62541_LIBRARIES} ua_pubsub_custom_manager)
+  endif()
+  endif()
+
   target_link_libraries(${EXAMPLE_NAME} open62541 ${open62541_LIBRARIES})
   assign_source_group(${EXAMPLE_SOURCE})
   add_dependencies(${EXAMPLE_NAME} open62541-amalgamation-header open62541-amalgamation-source)
@@ -25,6 +42,12 @@ macro(add_example EXAMPLE_NAME EXAMPLE_SOURCE)
     set_source_files_properties(${EXAMPLE_SOURCE} PROPERTIES LANGUAGE CXX)
   endif()
 endmacro()
+
+if(UA_ENABLE_PUBSUB)
+if(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT)
+  add_library(ua_pubsub_custom_manager ${PROJECT_SOURCE_DIR}/src/pubsub/ua_pubsub_custom_manager.c)
+endif()
+endif()
 
 #############
 # Tutorials #
@@ -143,5 +166,30 @@ if(UA_ENABLE_PUBSUB)
         message(WARNING "PubSub subscriber tutorial (preview) can not be used with AMALGAMATION. Skipping tutorial_pubsub_subscribe.")
     else(NOT UA_ENABLE_AMALGAMATION)
         add_example(tutorial_pubsub_subscribe pubsub/tutorial_pubsub_subscribe.c)
+    endif()
+
+    if(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT)
+        assign_source_group(${EXAMPLE_SOURCE})
+
+        if(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT_TSN)
+            set(custom_pubsub_sources ${PROJECT_SOURCE_DIR}/plugins/ua_network_pubsub_udp_custom_interrupt.c)
+        endif()
+
+        add_executable(custom_interrupt_publisher pubsub/pubsub_interrupt_publisher.c)
+        target_link_libraries (custom_interrupt_publisher custom_pubsub)
+
+        add_executable(custom_interrupt_loopback pubsub/pubsub_interrupt_loopback.c)
+        target_link_libraries (custom_interrupt_loopback custom_pubsub)
+
+        set_target_properties(custom_interrupt_publisher PROPERTIES FOLDER "open62541/examples")
+        set_target_properties(custom_interrupt_loopback PROPERTIES FOLDER "open62541/examples")
+
+        set_target_properties(custom_interrupt_publisher PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+        set_target_properties(custom_interrupt_loopback PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+        target_link_libraries(custom_interrupt_publisher open62541 ${open62541_LIBRARIES} rt pthread mbedtls mbedx509 mbedcrypto)
+        target_link_libraries(custom_interrupt_loopback open62541 ${open62541_LIBRARIES} rt pthread mbedtls mbedx509 mbedcrypto)
+
+        add_library(custom_pubsub ${custom_pubsub_sources})
     endif()
 endif()

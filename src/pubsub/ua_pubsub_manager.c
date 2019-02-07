@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
  * Copyright (c) 2017-2018 Fraunhofer IOSB (Author: Andreas Ebner)
+ * Copyright (c) 2018-2019 Kalycito Infotech Private Limited
  */
 
 #include "server/ua_server_internal.h"
@@ -291,6 +292,9 @@ UA_PubSubManager_delete(UA_Server *server, UA_PubSubManager *pubSubManager) {
 /***********************************/
 /*      PubSub Jobs abstraction    */
 /***********************************/
+
+#ifndef UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT
+
 UA_StatusCode
 UA_PubSubManager_addRepeatedCallback(UA_Server *server, UA_ServerCallback callback,
                                      void *data, UA_UInt32 interval, UA_UInt64 *callbackId) {
@@ -308,5 +312,5 @@ UA_StatusCode
 UA_PubSubManager_removeRepeatedPubSubCallback(UA_Server *server, UA_UInt64 callbackId) {
     return UA_Timer_removeRepeatedCallback(&server->timer, callbackId);
 }
-
+#endif
 #endif /* UA_ENABLE_PUBSUB */

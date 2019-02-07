@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
  * Copyright (c) 2017-2018 Fraunhofer IOSB (Author: Andreas Ebner)
+ * Copyright (c) 2018-2019 Kalycito Infotech Private Limited
  */
 
 /* Enable POSIX features */
@@ -58,6 +59,8 @@
 #include "ua_plugin_network.h"
 #include "ua_network_pubsub_udp.h"
 #include "ua_log_stdout.h"
+
+#define                PUBLISHER_IP_ADDRESS  "192.168.1.10"
 
 //UDP multicast network layer specific internal data
 typedef struct {
@@ -310,7 +313,14 @@ UA_PubSubChannelUDPMC_regist(UA_PubSubChannel *channel, UA_ExtensionObject *tran
         }
         struct ip_mreq groupV4;
         memcpy(&groupV4.imr_multiaddr, &((const struct sockaddr_in *)connectionConfig->ai_addr)->sin_addr, sizeof(struct ip_mreq));
+        /* Comment out the below line (UA_htonl)
+         * if  UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_INTERRUPT_TSN is disabled
+         * and un comment the next line and set ip address in line number 62
+         * (Only to be changed for custom based publisher and
+         * loopback executable)
+         */
         groupV4.imr_interface.s_addr = htonl(INADDR_ANY);
+        //groupV4.imr_interface.s_addr = inet_addr(PUBLISHER_IP_ADDRESS);
         //multihomed hosts can join several groups on different IF, INADDR_ANY -> kernel decides
 
         if(setsockopt(channel->sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &groupV4, sizeof(groupV4)) != 0){
