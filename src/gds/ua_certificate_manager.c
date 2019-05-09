@@ -5,7 +5,7 @@
  *    Copyright 2018 (c) Markus Karch, Fraunhofer IOSB
  */
 
-#include <ua_plugin_ca.h>
+#include "ua_plugin_ca.h"
 #include "ua_certificate_manager.h"
 #include "server/ua_server_internal.h"
 

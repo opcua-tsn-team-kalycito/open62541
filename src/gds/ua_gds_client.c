@@ -5,8 +5,8 @@
  *    Copyright 2018 (c) Markus Karch, Fraunhofer IOSB
  */
 
-#include <ua_client_internal.h>
-#include <ua_client_config.h>
+#include "ua_client_internal.h"
+#include "ua_client_config.h"
 #include "ua_gds_client.h"
 #include "ua_client_highlevel.h"
 #include "ua_util.h"
