@@ -42,6 +42,14 @@ UA_GDS_call_startSigningRequest(UA_Client *client,
                                 UA_ByteString *csr,
                                 UA_NodeId *requestId);
 
+UA_StatusCode UA_GDS_call_createSigningRequest(UA_Client *client,
+                                               const UA_NodeId *certificateGroupId,
+                                               const UA_NodeId *certificateTypeId,
+                                               UA_String *subjectName,
+                                               UA_Boolean *regeneratePrivateKey,
+                                               const UA_ByteString *nonce,
+                                               UA_ByteString *certificateRequest);
+
 UA_StatusCode
 UA_GDS_call_startNewKeyPairRequest(UA_Client *client,
                                           UA_NodeId *applicationId,

@@ -22,10 +22,19 @@ int main(int argc, char **argv) {
     UA_ClientConfig config = UA_ClientConfig_default;
     UA_String applicationUri = UA_String_fromChars("urn:open62541.example.server_register");
     UA_Client *client = UA_Client_new(config);
+    /* Change the localhost to the IP running GDS if needed */
     UA_StatusCode retval = UA_Client_connect_username(client, "opc.tcp://localhost:4841", "user1", "password");
     if(retval != UA_STATUSCODE_GOOD) {
         UA_Client_delete(client);
         UA_String_deleteMembers(&applicationUri);
+        return (int)retval;
+    }
+
+    /* A client to connect to the OPC UA server for pushing the certificate */
+    UA_Client *client_push = UA_Client_new(UA_ClientConfig_default);
+    retval = UA_Client_connect(client_push, "opc.tcp://localhost:4842");
+    if(retval != UA_STATUSCODE_GOOD) {
+        UA_Client_delete(client_push);
         return (int)retval;
     }
 
@@ -57,15 +66,15 @@ int main(int argc, char **argv) {
 
         //Request a new application instance certificate (with the associated private key)
         UA_NodeId requestId;
-        UA_String subjectName = UA_STRING("C=DE,O=open62541,CN=open62541@localhost");
-        UA_String appURI = UA_STRING("urn:unconfigured:application");
-        UA_String ipAddress = UA_STRING("192.168.0.1");
-        UA_String dnsName = UA_STRING("ILT532-ubuntu");
-        UA_String domainNames[3] = {appURI, ipAddress, dnsName};
+        UA_ByteString certificaterequest;
+        UA_String  subjectName  = UA_STRING("C=DE,O=open62541,CN=open62541@localhost");
+        UA_Boolean regenPrivKey = 1;
 
-        UA_GDS_call_startNewKeyPairRequest(client, &appId, &UA_NODEID_NULL, &UA_NODEID_NULL,
-                                    &subjectName, 3, domainNames,
-                                    &UA_STRING_NULL,&UA_STRING_NULL, &requestId);
+        UA_GDS_call_createSigningRequest(client_push, &UA_NODEID_NULL, &UA_NODEID_NULL, &subjectName,
+                                         &regenPrivKey, &UA_BYTESTRING_NULL, &certificaterequest);
+
+        UA_GDS_call_startSigningRequest(client, &appId, &UA_NODEID_NULL, &UA_NODEID_NULL,
+                                        &certificaterequest, &requestId);
 
         //Fetch the certificate and private key
         UA_ByteString certificate;
@@ -75,47 +84,7 @@ int main(int argc, char **argv) {
             retval = UA_GDS_call_finishRequest(client, &appId, &requestId,
                                                &certificate, &privateKey, &issuerCertificate);
 
-            //Request associated certificate groups
-            size_t certificateGroupSize = 0;
-            UA_NodeId *certificateGroupId;
-            UA_GDS_call_getCertificateGroups(client, &appId, &certificateGroupSize, &certificateGroupId);
-
-            for (size_t i = 0; i < certificateGroupSize; i++) {
-                printf("CertificateGroupID: NS:%u;Value=%u\n",
-                       certificateGroupId->namespaceIndex, certificateGroupId->identifier.numeric);
-            }
-
-
-            //Request the trust list
-            UA_NodeId trustListId;
-            UA_UInt32 filehandle;
-            UA_Byte mode = 0x01; //ReadMode (Part 5,p.100).
-            UA_TrustListDataType tl;
-            UA_TrustListDataType_init(&tl);
-            UA_Int32  tmp_length = 0;
-
-            UA_GDS_call_getTrustList(client, &appId, certificateGroupId, &trustListId);
-            UA_GDS_call_openTrustList(client, &mode, &filehandle);
-            UA_GDS_call_readTrustList(client, &filehandle, &tmp_length, &tl);
-            UA_GDS_call_closeTrustList(client, &filehandle);
-
-
-            //Start a server with the information received by the GDS
-            UA_ServerConfig *server_config =
-                    UA_ServerConfig_new_basic256sha256(4840, &certificate, &privateKey,
-                                                       tl.trustedCertificates, tl.trustedCertificatesSize,
-                                                       tl.trustedCrls, tl.trustedCrlsSize);
-            UA_Server *server = UA_Server_new(server_config);
-            retval = UA_Server_run(server, &running);
-            UA_Server_delete(server);
-            UA_ServerConfig_delete(server_config);
-
-            UA_ByteString_deleteMembers(&certificate);
-            UA_ByteString_deleteMembers(&privateKey);
-            UA_ByteString_deleteMembers(&issuerCertificate);
-            UA_free(certificateGroupId);
-            UA_TrustListDataType_deleteMembers(&tl);
-
+            /* To Do: Update Certificate */
         }
     }
 

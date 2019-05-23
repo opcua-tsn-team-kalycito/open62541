@@ -10,7 +10,6 @@
 
 #ifdef UA_ENABLE_GDS_CM
 
-
 #define UA_LOG_GNUERR                                                  \
     UA_LOG_WARNING(scg->logger, UA_LOGCATEGORY_SERVER, \
                    "gnuTLS returned an error: %s", gnutls_strerror(gnuErr));           \
@@ -70,7 +69,6 @@ static void deleteMembers_gnutls(UA_GDS_CA *cg) {
     UA_free(cc);
     cg->context = NULL;
 }
-
 
 static UA_StatusCode generate_private_key(UA_GDS_CA *scg,
                                               gnutls_x509_privkey_t *privKey,
@@ -353,8 +351,6 @@ UA_StatusCode createNewKeyPair_gnutls (UA_GDS_CA *scg,
                                    UA_ByteString *privateKey,
                                    size_t *issuerCertificateSize,
                                    UA_ByteString **issuerCertificates) {
-
-
 
     UA_StatusCode ret = UA_STATUSCODE_GOOD;
     UA_String subjectName_nullTerminated;
@@ -902,7 +898,6 @@ UA_StatusCode UA_initCA(UA_GDS_CA *scg,
                         unsigned int caBitKeySize,
                         UA_Logger *logger) {
     memset(scg, 0, sizeof(UA_GDS_CA));
-
     scg->logger = logger;
     scg->certificateSigningRequest = csr_gnutls;
     scg->createNewKeyPair = createNewKeyPair_gnutls;

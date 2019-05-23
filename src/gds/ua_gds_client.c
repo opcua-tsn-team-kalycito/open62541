@@ -336,6 +336,43 @@ UA_GDS_call_readTrustList(UA_Client *client,
     return retval;
 }
 
+
+
+UA_StatusCode
+UA_GDS_call_createSigningRequest(UA_Client *client,
+                                 const UA_NodeId *certificateGroupId,
+                                 const UA_NodeId *certificateTypeId,
+                                 UA_String *subjectName,
+                                 UA_Boolean *regeneratePrivateKey,
+                                 const UA_ByteString *nonce,
+                                 UA_ByteString *certificateRequest) {
+
+    UA_Variant input[5];
+
+    UA_Variant_setScalarCopy(&input[0], certificateGroupId, &UA_TYPES[UA_TYPES_NODEID]);
+    UA_Variant_setScalarCopy(&input[1], certificateTypeId, &UA_TYPES[UA_TYPES_NODEID]);
+    UA_Variant_setScalarCopy(&input[2], subjectName, &UA_TYPES[UA_TYPES_STRING]);
+    UA_Variant_setScalarCopy(&input[3], regeneratePrivateKey, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    UA_Variant_setScalarCopy(&input[4], nonce, &UA_TYPES[UA_TYPES_BYTESTRING]);
+    size_t outputSize;
+    UA_Variant *output;
+    UA_StatusCode retval = UA_Client_call(client, UA_NODEID_NUMERIC(0, 12637),
+                                          UA_NODEID_NUMERIC(0, 12737), 5, input, &outputSize, &output);
+    if(retval == UA_STATUSCODE_GOOD) {
+        UA_ByteString *certReq = (UA_ByteString *) output[0].data;
+        UA_ByteString_allocBuffer(certificateRequest, certReq->length);
+        memcpy(certificateRequest->data, certReq->data, certReq->length);
+    } else {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                    "Method call was unsuccessful, and %x returned values available.\n", retval);
+    }
+
+    return retval;
+}
+
+
+
+
 UA_StatusCode
 UA_GDS_call_closeTrustList(UA_Client *client,
                            UA_UInt32 *fileHandle) {

@@ -19,6 +19,27 @@
 /**********************************************/
 /*         CertificateManager-Callbacks       */
 /**********************************************/
+static UA_StatusCode
+createSigningRequestMethodCallback (UA_Server *server,
+                    const UA_NodeId *sessionId, void *sessionHandle,
+                    const UA_NodeId *methodId, void *methodContext,
+                    const UA_NodeId *objectId, void *objectContext,
+                    size_t inputSize, const UA_Variant *input,
+                    size_t outputSize, UA_Variant *output) {
+    UA_ByteString certrequest ;
+    UA_StatusCode retval = UA_GDS_CreateSigningRequest(server,
+                                                       (UA_NodeId *) input[0].data,
+                                                       (UA_NodeId *) input[1].data,
+                                                       (UA_String *) input[2].data,
+                                                       (UA_Boolean *) input[3].data,
+                                                       (UA_ByteString *) input[4].data,
+                                                       &certrequest);
+
+    if (retval == UA_STATUSCODE_GOOD)
+        UA_Variant_setScalarCopy(output, &certrequest, &UA_TYPES[UA_TYPES_BYTESTRING]);
+
+    return retval;
+}
 
 static UA_StatusCode
 openMethodCallback(UA_Server *server,

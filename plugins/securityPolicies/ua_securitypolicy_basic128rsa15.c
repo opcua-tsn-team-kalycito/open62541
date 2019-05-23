@@ -761,6 +761,46 @@ deleteMembers_sp_basic128rsa15(UA_SecurityPolicy *securityPolicy) {
     securityPolicy->policyContext = NULL;
 }
 
+UA_StatusCode private_key_abstraction(UA_SecurityPolicy *securityPolicy,
+                                      UA_ByteString *private_key) {
+
+    if (securityPolicy == NULL) {
+        return UA_STATUSCODE_BADINTERNALERROR;
+    }
+
+    if (securityPolicy->policyContext == NULL) {
+        return UA_STATUSCODE_BADINTERNALERROR;
+    }
+
+    Basic128Rsa15_PolicyContext *pc = (Basic128Rsa15_PolicyContext *)securityPolicy->policyContext;
+    UA_ByteString privkey_buffer;
+    UA_StatusCode retval = UA_STATUSCODE_GOOD;
+    size_t privkey_length = 0;
+
+    /* To do: Allocation of buffer has to be changed */
+    retval = UA_ByteString_allocBuffer(&privkey_buffer, 16000);
+    if(retval != UA_STATUSCODE_GOOD)
+        return retval;
+
+    int ret = mbedtls_pk_write_key_der(&pc->localPrivateKey, privkey_buffer.data, 16000);
+    if (ret <= 0) {
+        return UA_STATUSCODE_BADINTERNALERROR;
+    }
+    privkey_length = (size_t)ret;
+
+    /* Private key has been copied to the buffer */
+    retval = UA_ByteString_allocBuffer(private_key, privkey_length + 1);
+    if(retval != UA_STATUSCODE_GOOD) {
+        return retval;
+    }
+    memcpy(private_key->data, privkey_buffer.data, privkey_length);
+    private_key->data[privkey_length] = '\0';
+    private_key->length--;
+
+    return retval;
+}
+
+
 static UA_StatusCode
 updateCertificateAndPrivateKey_sp_basic128rsa15(UA_SecurityPolicy *securityPolicy,
                                                 const UA_ByteString newCertificate,

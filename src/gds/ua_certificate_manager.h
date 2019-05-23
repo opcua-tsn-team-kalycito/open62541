@@ -48,6 +48,9 @@ typedef struct{
 UA_StatusCode
 UA_GDS_CertificateManager_init(UA_Server *server);
 
+UA_StatusCode create_csr(UA_String *subjectName,
+                         UA_ByteString *certificateRequest);
+
 UA_StatusCode
 UA_GDS_FinishRequest(UA_Server *server,
                   UA_NodeId *applicationId,
@@ -83,6 +86,15 @@ UA_GDS_StartSigningRequest(UA_Server *server,
                         UA_NodeId *certificateTypeId,
                         UA_ByteString *certificateRequest,
                         UA_NodeId *requestId);
+
+UA_StatusCode
+UA_GDS_CreateSigningRequest(UA_Server *server,
+                            UA_NodeId *certificateGroupId,
+                            UA_NodeId *certificateTypeId,
+                            UA_String *subjectName,
+                            UA_Boolean *regeneratePrivateKey,
+                            UA_ByteString * nonce,
+                            UA_ByteString *certificateRequest);
 
 UA_StatusCode
 UA_GDS_GetCertificateGroups(UA_Server *server,

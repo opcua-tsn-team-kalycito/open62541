@@ -209,6 +209,9 @@ if(UA_ENABLE_GDS_CM)
     endif()
 endif()
 
+option(UA_ENABLE_SERVER_PUSH "Enable Server for Push Certs" OFF)
+mark_as_advanced(UA_ENABLE_SERVER_PUSH)
+
 option(UA_ENABLE_GDS_CLIENT "Enable functions to access the Global Discovery Server" OFF)
 mark_as_advanced(UA_ENABLE_GDS_CLIENT)
 

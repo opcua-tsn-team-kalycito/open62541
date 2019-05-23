@@ -34,6 +34,10 @@ UA_SecurityPolicy_Basic256Sha256(UA_SecurityPolicy *policy,
                                  const UA_ByteString localPrivateKey,
                                  const UA_Logger *logger);
 
+UA_EXPORT UA_StatusCode
+private_key_abstraction(UA_SecurityPolicy *securityPolicy,
+                        UA_ByteString *private_key);
+
 #endif
 
 _UA_END_DECLS

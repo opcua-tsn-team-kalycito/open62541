@@ -11,6 +11,59 @@
 
 #ifdef UA_ENABLE_GDS
 
+UA_StatusCode create_csr(UA_String *subjectName,
+                         UA_ByteString *certificateRequest) {
+    gnutls_x509_crq_t crq;
+    gnutls_x509_privkey_t private_key;
+    unsigned int security_bits;
+    UA_String subjectName_nullTerminated;
+    unsigned char buffer[10 * 1024];
+    size_t buffer_size = sizeof(buffer);
+
+    /* Initialize an empty certificate request, and
+     * an empty private key.
+     */
+    gnutls_x509_crq_init(&crq);
+
+    gnutls_x509_privkey_init(&private_key);
+
+    /* Generate an RSA key of high security.
+     */
+    security_bits = gnutls_sec_param_to_pk_bits(GNUTLS_PK_RSA,
+                                       GNUTLS_SEC_PARAM_HIGH);
+
+    /* Create a private key */
+    gnutls_x509_privkey_generate(private_key, GNUTLS_PK_RSA, security_bits, 0);
+
+    //gnutls_x509_crt_set_dn requires null terminated string
+    subjectName_nullTerminated.length = subjectName->length + 1;
+    subjectName_nullTerminated.data = (UA_Byte *)
+            UA_calloc(subjectName_nullTerminated.length, sizeof(UA_Byte));
+    memcpy(subjectName_nullTerminated.data, subjectName->data, subjectName->length);
+    subjectName_nullTerminated.length--;
+
+    /* Add subject name to the distinguished name */
+    gnutls_x509_crq_set_dn(crq, (char *) subjectName_nullTerminated.data, NULL);
+
+    /* Set the request version to 3 */
+    gnutls_x509_crq_set_version(crq, 3);
+
+    /* Associate the request with the private key */
+    gnutls_x509_crq_set_key(crq, private_key);
+
+    /* Self sign the certificate request.
+     */
+    gnutls_x509_crq_sign2(crq, private_key, GNUTLS_DIG_SHA1, 0);
+
+    /* Export the PEM encoded certificate request, and
+     * display it */
+    gnutls_x509_crq_export(crq, GNUTLS_X509_FMT_DER, buffer,
+                           &buffer_size);
+
+    return UA_STATUSCODE_GOOD;
+
+}
+
 #define UA_GDS_CM_CHECK_MALLOC(pointer) \
                     if (!pointer) {    \
                         UA_LOG_WARNING(&server->config.logger, UA_LOGCATEGORY_SERVER, "malloc failed"); \
@@ -259,6 +312,7 @@ UA_GDS_StartNewKeyPairRequest(UA_Server *server,
                            UA_String *privateKeyPassword,
                            UA_NodeId *requestId) {
     UA_GDS_CertificateGroup *cg;
+
     UA_StatusCode retval =
             getCertificateGroup(server, applicationId, certificateGroupId, &cg);
 
@@ -330,6 +384,38 @@ UA_GDS_StartSigningRequest(UA_Server *server,
     return retval;
 }
 
+UA_StatusCode
+UA_GDS_CreateSigningRequest(UA_Server *server,
+                            UA_NodeId *certificateGroupId,
+                            UA_NodeId *certificateTypeId,
+                            UA_String *subjectName,
+                            UA_Boolean *regeneratePrivateKey,
+                            UA_ByteString *nonce,
+                            UA_ByteString *certificateRequest){
+
+    UA_StatusCode retval = UA_STATUSCODE_GOOD;
+    UA_ByteString output;
+    retval = create_csr(subjectName, &output);
+    return retval;
+ /*   retval = ca->certificateSigningRequest(ca, 0, certificateRequest,
+                                           &newEntry->certificate,
+                                           &newEntry->issuerCertificateSize,
+                                           &newEntry->issuerCertificates);
+
+    if (retval == UA_STATUSCODE_GOOD){
+        *requestId = newEntry->requestId = UA_NODEID_GUID(2, UA_Guid_random());
+        newEntry->applicationId = *applicationId;
+        newEntry->isApproved = UA_TRUE;
+        newEntry->privateKey = UA_BYTESTRING_NULL;
+        LIST_INSERT_HEAD(&server->certificateManager.gds_cm_list, newEntry, pointers);
+        server->certificateManager.counter++;
+    }
+    else {
+        delete_CertificateManager_entry(newEntry);
+    };
+
+    return retval;*/
+}
 
 UA_StatusCode
 UA_GDS_FinishRequest(UA_Server *server,
