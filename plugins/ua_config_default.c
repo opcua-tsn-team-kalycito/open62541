@@ -310,6 +310,10 @@ createDefaultConfig(void) {
 #ifdef UA_ENABLE_GDS_CM
     createDefaultCertificateGroup(conf);
 #endif
+#if defined(UA_ENABLE_GDS_CM) && defined(UA_ENABLE_SERVER_PUSH)
+    conf->regeneratePrivateKey = false;
+#endif
+
     /* Limits for MonitoredItems */
     conf->samplingIntervalLimits = UA_DURATIONRANGE(50.0, 24.0 * 3600.0 * 1000.0);
     conf->queueSizeLimits = UA_UINT32RANGE(1, 100);

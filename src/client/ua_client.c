@@ -227,7 +227,9 @@ UA_Client_delete(UA_Client* client) {
     }
 
 #ifdef UA_ENABLE_GDS_CLIENT
-    UA_GDS_Client_deinit(client);
+#ifndef UA_ENABLE_SERVER_PUSH
+    UA_GDS_Client_deinit(client); //To do: Temporary fix for corrupted double linked list
+#endif
 #endif
 
     UA_Client_deleteMembers(client);

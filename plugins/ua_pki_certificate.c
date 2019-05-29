@@ -226,4 +226,57 @@ UA_CertificateVerification_Trustlist(UA_CertificateVerification *cv,
     return UA_STATUSCODE_GOOD;
 }
 
+UA_StatusCode
+VerifyUpdatedCertificate(const UA_ByteString *newCertificate,
+                         const UA_ByteString *issuerCertificates) {
+
+    mbedtls_x509_crt newCert;
+    mbedtls_x509_crt issuerCert;
+
+    mbedtls_x509_crt_init(&newCert);
+    mbedtls_x509_crt_init(&issuerCert);
+
+    int mbedErr = mbedtls_x509_crt_parse(&newCert,
+                                         newCertificate->data,
+                                         newCertificate->length);
+    mbedErr |= mbedtls_x509_crt_parse(&issuerCert,
+                                      issuerCertificates->data,
+                                      issuerCertificates->length);
+    if(mbedErr) {
+        return UA_STATUSCODE_BADINTERNALERROR;
+    }
+
+    /* Verify the certificate profile */
+    mbedtls_x509_crt_profile crtProfile = {
+        MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA1) | MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA256),
+        0xFFFFFF, 0x000000, 128 * 8 // in bits
+        }; // TODO: remove magic numbers
+
+    uint32_t flags = 0;
+    mbedErr = mbedtls_x509_crt_verify_with_profile(&newCert,
+                                                   &issuerCert,
+                                                   NULL,
+                                                   &crtProfile, NULL, &flags, NULL, NULL);
+
+    // TODO: Extend verification
+    UA_StatusCode retval = UA_STATUSCODE_GOOD;
+    if(mbedErr) {
+        if(flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) {
+            retval = UA_STATUSCODE_BADCERTIFICATEUNTRUSTED;
+        } else if (flags & MBEDTLS_X509_BADCERT_FUTURE ||
+                   flags & MBEDTLS_X509_BADCERT_EXPIRED) {
+            retval = UA_STATUSCODE_BADCERTIFICATETIMEINVALID;
+        } else if(flags & MBEDTLS_X509_BADCERT_REVOKED ||
+                  flags & MBEDTLS_X509_BADCRL_EXPIRED) {
+            retval = UA_STATUSCODE_BADCERTIFICATEREVOKED;
+        } else {
+            retval = UA_STATUSCODE_BADSECURITYCHECKSFAILED;
+        }
+    }
+
+    mbedtls_x509_crt_free(&newCert);
+    mbedtls_x509_crt_free(&issuerCert);
+    return retval;
+}
+
 #endif

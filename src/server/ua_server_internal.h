@@ -40,9 +40,6 @@ _UA_BEGIN_DECLS
 #endif
 #endif
 
-/* To Do: Parse from CMake */
-#define UA_ENABLE_SERVER_PUSH
-
 #ifdef UA_ENABLE_SERVER_PUSH
 #include "ua_ca_gnutls.h"
 #include <gnutls/x509.h>
@@ -319,8 +316,10 @@ UA_StatusCode copy_private_key_gnu_struc(gnutls_datum_t *data_privkey,
                                          UA_ByteString *privkey_copy);
 
 UA_StatusCode create_csr(UA_Server *server, UA_String *subjectName,
-                         UA_Boolean *regeneratePrivateKey,
                          UA_ByteString *certificateRequest);
+
+UA_StatusCode server_update_certificate(UA_Server *server, UA_ByteString *certificate,
+                                        UA_Boolean *applyChangesRequired);
 UA_StatusCode
 UA_GDS_CreateSigningRequest(UA_Server *server,
                             UA_NodeId *certificateGroupId,
@@ -329,6 +328,15 @@ UA_GDS_CreateSigningRequest(UA_Server *server,
                             UA_Boolean *regeneratePrivateKey,
                             UA_ByteString * nonce,
                             UA_ByteString *certificateRequest);
+UA_StatusCode
+UA_GDS_UpdateCertificate(UA_Server *server,
+                         const UA_NodeId *certificateGroupId,
+                         const UA_NodeId *certificateTypeId,
+                         UA_ByteString *certificate,
+                         UA_ByteString *issuerCertificates,
+                         UA_String *privateKeyFormat,
+                         UA_ByteString *privateKey,
+                         UA_Boolean *applyChangesRequired);
 UA_StatusCode UA_SERVER_initpushmanager(UA_Server *server);
 #endif
 _UA_END_DECLS

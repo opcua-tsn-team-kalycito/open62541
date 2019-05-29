@@ -50,6 +50,15 @@ UA_StatusCode UA_GDS_call_createSigningRequest(UA_Client *client,
                                                const UA_ByteString *nonce,
                                                UA_ByteString *certificateRequest);
 
+UA_StatusCode UA_GDS_call_updateCertificates(UA_Client *client,
+                                             const UA_NodeId *certificateGroupId,
+                                             const UA_NodeId *certificateTypeId,
+                                             UA_ByteString *certificate,
+                                             UA_ByteString *issuerCertificates,
+                                             const UA_String *privateKeyFormat,
+                                             UA_ByteString *privateKey,
+                                             UA_Boolean *applyChangesRequired);
+
 UA_StatusCode
 UA_GDS_call_startNewKeyPairRequest(UA_Client *client,
                                           UA_NodeId *applicationId,

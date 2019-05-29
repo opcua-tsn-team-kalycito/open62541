@@ -12,7 +12,7 @@
 
 #define MIN_ARGS           3
 #define FAILURE            1
-#define CONNECTION_STRING  "opc.tcp://localhost:4840"
+#define CONNECTION_STRING  "opc.tcp://localhost:4842"
 
 /* cleanupClient deletes the memory allocated for client configuration.
  *

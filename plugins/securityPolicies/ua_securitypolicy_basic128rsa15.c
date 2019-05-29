@@ -33,7 +33,7 @@
 #define UA_SECURITYPOLICY_BASIC128RSA15_SYM_ENCRYPTION_BLOCK_SIZE 16
 #define UA_SECURITYPOLICY_BASIC128RSA15_SYM_PLAIN_TEXT_BLOCK_SIZE 16
 #define UA_SECURITYPOLICY_BASIC128RSA15_MINASYMKEYLENGTH 128
-#define UA_SECURITYPOLICY_BASIC128RSA15_MAXASYMKEYLENGTH 256
+#define UA_SECURITYPOLICY_BASIC128RSA15_MAXASYMKEYLENGTH 512
 
 #define UA_LOG_MBEDERR                                                  \
     char errBuff[300];                                                  \
@@ -308,7 +308,6 @@ asymmetricModule_compareCertificateThumbprint_sp_basic128rsa15(const UA_Security
     Basic128Rsa15_PolicyContext *pc = (Basic128Rsa15_PolicyContext *)securityPolicy->policyContext;
     if(!UA_ByteString_equal(certificateThumbprint, &pc->localCertThumbprint))
         return UA_STATUSCODE_BADCERTIFICATEINVALID;
-
     return UA_STATUSCODE_GOOD;
 }
 
@@ -772,29 +771,30 @@ UA_StatusCode private_key_abstraction(UA_SecurityPolicy *securityPolicy,
         return UA_STATUSCODE_BADINTERNALERROR;
     }
 
-    Basic128Rsa15_PolicyContext *pc = (Basic128Rsa15_PolicyContext *)securityPolicy->policyContext;
-    UA_ByteString privkey_buffer;
     UA_StatusCode retval = UA_STATUSCODE_GOOD;
-    size_t privkey_length = 0;
+    Basic128Rsa15_PolicyContext *pc = (Basic128Rsa15_PolicyContext *)securityPolicy->policyContext;
 
-    /* To do: Allocation of buffer has to be changed */
-    retval = UA_ByteString_allocBuffer(&privkey_buffer, 16000);
-    if(retval != UA_STATUSCODE_GOOD)
-        return retval;
+    /* To Do: Buffer length has to be modified */
+    unsigned char output_buffer[16000];
+    UA_ByteString privkey_buffer;
+    privkey_buffer.data = output_buffer;
 
-    int ret = mbedtls_pk_write_key_der(&pc->localPrivateKey, privkey_buffer.data, 16000);
+    memset(output_buffer, 0, 16000);
+
+    int ret = mbedtls_pk_write_key_der(&pc->localPrivateKey, output_buffer, 16000);
     if (ret <= 0) {
         return UA_STATUSCODE_BADINTERNALERROR;
     }
-    privkey_length = (size_t)ret;
+    privkey_buffer.length = (size_t)ret;
+    privkey_buffer.data = output_buffer + sizeof(output_buffer) - privkey_buffer.length;
 
     /* Private key has been copied to the buffer */
-    retval = UA_ByteString_allocBuffer(private_key, privkey_length + 1);
+    retval = UA_ByteString_allocBuffer(private_key, privkey_buffer.length + 1);
     if(retval != UA_STATUSCODE_GOOD) {
         return retval;
     }
-    memcpy(private_key->data, privkey_buffer.data, privkey_length);
-    private_key->data[privkey_length] = '\0';
+    memcpy(private_key->data, privkey_buffer.data, privkey_buffer.length);
+    private_key->data[privkey_buffer.length] = '\0';
     private_key->length--;
 
     return retval;
@@ -822,15 +822,17 @@ updateCertificateAndPrivateKey_sp_basic128rsa15(UA_SecurityPolicy *securityPolic
     securityPolicy->localCertificate.data[newCertificate.length] = '\0';
     securityPolicy->localCertificate.length--;
 
-    /* Set the new private key */
-    mbedtls_pk_free(&pc->localPrivateKey);
-    mbedtls_pk_init(&pc->localPrivateKey);
-    int mbedErr = mbedtls_pk_parse_key(&pc->localPrivateKey,
-                                       newPrivateKey.data, newPrivateKey.length,
-                                       NULL, 0);
-    UA_MBEDTLS_ERRORHANDLING(UA_STATUSCODE_BADSECURITYCHECKSFAILED);
-    if(retval != UA_STATUSCODE_GOOD)
-        goto error;
+    if (!UA_ByteString_equal(&newPrivateKey, &UA_BYTESTRING_NULL)) {
+        /* Set the new private key */
+        mbedtls_pk_free(&pc->localPrivateKey);
+        mbedtls_pk_init(&pc->localPrivateKey);
+        int mbedErr = mbedtls_pk_parse_key(&pc->localPrivateKey,
+                                           newPrivateKey.data, newPrivateKey.length,
+                                           NULL, 0);
+        UA_MBEDTLS_ERRORHANDLING(UA_STATUSCODE_BADSECURITYCHECKSFAILED);
+        if(retval != UA_STATUSCODE_GOOD)
+            goto error;
+    }
 
     retval = asym_makeThumbprint_sp_basic128rsa15(pc->securityPolicy,
                                                   &securityPolicy->localCertificate,

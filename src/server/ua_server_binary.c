@@ -660,7 +660,6 @@ createSecureChannel(void *application, UA_Connection *connection,
                                          &asymHeader->receiverCertificateThumbprint);
         if(retval != UA_STATUSCODE_GOOD)
             continue;
-
         /* We found the correct endpoint (except for security mode) The endpoint
          * needs to be changed by the client / server to match the security
          * mode. The server does this in the securechannel manager */

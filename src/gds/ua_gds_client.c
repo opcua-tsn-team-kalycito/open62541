@@ -370,7 +370,42 @@ UA_GDS_call_createSigningRequest(UA_Client *client,
     return retval;
 }
 
+UA_StatusCode
+UA_GDS_call_updateCertificates(UA_Client *client,
+                               const UA_NodeId *certificateGroupId,
+                               const UA_NodeId *certificateTypeId,
+                               UA_ByteString *certificate,
+                               UA_ByteString *issuerCertificates,
+                               const UA_String *privateKeyFormat,
+                               UA_ByteString *privateKey,
+                               UA_Boolean *applyChangesRequired) {
 
+    UA_Variant input[6];
+
+    UA_Variant_setScalarCopy(&input[0], certificateGroupId, &UA_TYPES[UA_TYPES_NODEID]);
+    UA_Variant_setScalarCopy(&input[1], certificateTypeId, &UA_TYPES[UA_TYPES_NODEID]);
+    UA_Variant_setScalarCopy(&input[2], certificate, &UA_TYPES[UA_TYPES_BYTESTRING]);
+    UA_Variant_setArrayCopy(&input[3], issuerCertificates, 1, &UA_TYPES[UA_TYPES_BYTESTRING]);
+    UA_Variant_setScalarCopy(&input[4], privateKeyFormat, &UA_TYPES[UA_TYPES_STRING]);
+    UA_Variant_setScalarCopy(&input[5], privateKey, &UA_TYPES[UA_TYPES_BYTESTRING]);
+
+    size_t outputSize;
+    UA_Variant *output;
+
+    UA_StatusCode retval = UA_Client_call(client, UA_NODEID_NUMERIC(0, 12637),
+                                          UA_NODEID_NUMERIC(0, 13737), 6, input, &outputSize, &output);
+    if(retval == UA_STATUSCODE_GOOD) {
+
+        UA_Boolean *applyChanges = (UA_Boolean *) output[0].data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                    "Certificates are updated to the standalone opc server successfully and apply changes value %d.\n", *applyChanges);
+    } else {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                    "UA_GDS_call_updateCertificates Method call was unsuccessful, and %x returned values available.\n", retval);
+    }
+
+    return retval;
+}
 
 
 UA_StatusCode
@@ -395,8 +430,10 @@ UA_DataTypeArray *UA_GDS_Client_DataTypeArray;
 
 UA_StatusCode
 UA_GDS_Client_deinit(UA_Client *client) {
-    client->config.customDataTypes = UA_GDS_Client_DataTypeArray->next;
-    UA_free(UA_GDS_Client_DataTypeArray);
+    if (UA_GDS_Client_DataTypeArray->next != NULL) { //To do: Remove this if case in the future after the fix
+        client->config.customDataTypes = UA_GDS_Client_DataTypeArray->next;
+        UA_free(UA_GDS_Client_DataTypeArray);
+    }
     return UA_STATUSCODE_GOOD;
 }
 UA_StatusCode

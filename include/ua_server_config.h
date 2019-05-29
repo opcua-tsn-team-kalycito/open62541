@@ -108,6 +108,9 @@ struct UA_ServerConfig {
     UA_GDS_CertificateGroup *gds_certificateGroups;
 #endif
 
+#if defined(UA_ENABLE_GDS_CM) && defined(UA_ENABLE_SERVER_PUSH)
+    UA_Boolean regeneratePrivateKey;
+#endif
     /* Available endpoints */
     size_t endpointsSize;
     UA_Endpoint *endpoints;

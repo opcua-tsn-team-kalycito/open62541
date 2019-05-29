@@ -63,9 +63,6 @@ int main(int argc, char **argv) {
         UA_String dnsName = UA_STRING("ILT532-ubuntu");
         UA_String domainNames[3] = {appURI, ipAddress, dnsName};
 
-        UA_GDS_call_createSigningRequest(client, &UA_NODEID_NULL, &UA_NODEID_NULL, &subjectName,
-                                         &regenPrivKey, &UA_BYTESTRING_NULL, &certificaterequest);
-
         UA_GDS_call_startNewKeyPairRequest(client, &appId, &UA_NODEID_NULL, &UA_NODEID_NULL,
                                            &subjectName, 3, domainNames,
                                            &UA_STRING_NULL,&UA_STRING_NULL, &requestId);

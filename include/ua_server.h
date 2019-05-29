@@ -20,6 +20,9 @@
 
 _UA_BEGIN_DECLS
 
+/* To Do: Parse from CMake */
+#define UA_ENABLE_SERVER_PUSH
+
 /* Forward declarations */
 struct UA_ServerConfig;
 typedef struct UA_ServerConfig UA_ServerConfig;

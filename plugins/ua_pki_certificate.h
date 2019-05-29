@@ -26,6 +26,10 @@ UA_CertificateVerification_Trustlist(UA_CertificateVerification *cv,
                                      const UA_ByteString *certificateRevocationList,
                                      size_t certificateRevocationListSize);
 
+UA_StatusCode
+VerifyUpdatedCertificate(const UA_ByteString *newCertificate,
+                         const UA_ByteString *issuerCertificate);
+
 #endif
 
 _UA_END_DECLS
