@@ -11,7 +11,6 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/tools/cmake")
 find_package(PythonInterp REQUIRED)
 find_package(Git)
 include(AssignSourceGroup)
-include(GNUInstallDirs)
 
 # Set when installed via make install
 set(open62541_TOOLS_DIR ${PROJECT_SOURCE_DIR}/tools)
@@ -36,6 +35,9 @@ set(OPEN62541_VER_MAJOR 0)
 set(OPEN62541_VER_MINOR 4)
 set(OPEN62541_VER_PATCH 0)
 set(OPEN62541_VER_LABEL "-dev") # Appended to the X.Y.Z version format. For example "-rc1" or an empty string
+
+#  If a relative path is specified, it is treated as relative to the $<INSTALL_PREFIX>
+set(LIB_INSTALL_DIR lib CACHE PATH "Installation path of libraries")
 
 # Set OPEN62541_VER_COMMIT
 if(GIT_FOUND)
@@ -211,7 +213,7 @@ mark_as_advanced(UA_ENABLE_PUBSUB_ETH_UADP)
 if(UA_ENABLE_PUBSUB_ETH_UADP)
     if (NOT CMAKE_SYSTEM MATCHES "Linux")
     message(FATAL_ERROR "UADP over Ethernet is only available on Linux.")
-	endif()
+    endif()
 endif()
 
 option(UA_ENABLE_PUBSUB_DELTAFRAMES "Enable sending of delta frames with only the changes" OFF)
@@ -250,6 +252,10 @@ mark_as_advanced(UA_ENABLE_JSON_ENCODING)
 option(UA_ENABLE_PUBSUB_MQTT "Enable publish/subscribe with mqtt (experimental)" OFF)
 mark_as_advanced(UA_ENABLE_PUBSUB_MQTT)
 if(UA_ENABLE_PUBSUB_MQTT)
+    # Warn if run in Windows
+    if(WIN32)
+        MESSAGE(WARNING "Multithreading is enabled in MQTT plugin. This feature is under development and marked as EXPERIMENTAL")
+    endif()
     if(NOT UA_ENABLE_PUBSUB)
     message(FATAL_ERROR "Mqtt cannot be used with disabled PubSub function.")
     endif()
@@ -400,7 +406,7 @@ include(CompilerFlags)
 if(NOT UA_COMPILE_AS_CXX AND (CMAKE_COMPILER_IS_GNUCC OR "x${CMAKE_C_COMPILER_ID}" STREQUAL "xClang"))
     # Compiler
     add_definitions(-std=c99 -pipe
-                    -Wall -Wextra -Wpedantic
+                    -Wall -Wextra -Werror -Wpedantic
                     -Wno-static-in-inline # clang doesn't like the use of static inline methods inside static inline methods
                     -Wno-overlength-strings # may happen in the nodeset compiler when complex values are directly encoded
                     -Wno-unused-parameter # some methods may require unused arguments to cast to a method pointer
@@ -416,7 +422,6 @@ if(NOT UA_COMPILE_AS_CXX AND (CMAKE_COMPILER_IS_GNUCC OR "x${CMAKE_C_COMPILER_ID
                     -fno-strict-aliasing # fewer compiler assumptions about pointer types
                     -fexceptions # recommended for multi-threaded C code, also in combination with C++ code
                     )
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Werror")
 
     if (NOT MINGW)
         if(UA_ENABLE_HARDENING)
@@ -715,14 +720,18 @@ if(UA_ENABLE_PUBSUB)
         list(APPEND default_plugin_sources ${PROJECT_SOURCE_DIR}/plugins/ua_pubsub_ethernet.c)
     endif()
     if(UA_ENABLE_PUBSUB_MQTT)
-        list(APPEND default_plugin_headers ${PROJECT_SOURCE_DIR}/deps/mqtt-c/mqtt_pal.h)
-        list(APPEND default_plugin_sources ${PROJECT_SOURCE_DIR}/plugins/mqtt/ua_mqtt_pal.c)
-        list(APPEND default_plugin_headers ${PROJECT_SOURCE_DIR}/deps/mqtt-c/mqtt.h)
-        list(APPEND default_plugin_sources ${PROJECT_SOURCE_DIR}/deps/mqtt-c/mqtt.c)
-        list(APPEND default_plugin_headers ${PROJECT_SOURCE_DIR}/plugins/ua_network_pubsub_mqtt.h)
-        list(APPEND default_plugin_sources ${PROJECT_SOURCE_DIR}/plugins/ua_network_pubsub_mqtt.c)  
-        list(APPEND default_plugin_headers ${PROJECT_SOURCE_DIR}/plugins/mqtt/ua_mqtt_adapter.h)                   
-        list(APPEND default_plugin_sources ${PROJECT_SOURCE_DIR}/plugins/mqtt/ua_mqtt_adapter.c)
+        if(WIN32)
+            MESSAGE(WARNING "Multithreading is enabled in MQTT plugin. This feature is under development and marked as EXPERIMENTAL")
+        else()
+            list(APPEND default_plugin_headers ${PROJECT_SOURCE_DIR}/deps/mqtt-c/mqtt_pal.h)
+            list(APPEND default_plugin_sources ${PROJECT_SOURCE_DIR}/plugins/mqtt/ua_mqtt_pal.c)
+            list(APPEND default_plugin_headers ${PROJECT_SOURCE_DIR}/deps/mqtt-c/mqtt.h)
+            list(APPEND default_plugin_sources ${PROJECT_SOURCE_DIR}/deps/mqtt-c/mqtt.c)
+            list(APPEND default_plugin_headers ${PROJECT_SOURCE_DIR}/plugins/ua_network_pubsub_mqtt.h)
+            list(APPEND default_plugin_sources ${PROJECT_SOURCE_DIR}/plugins/ua_network_pubsub_mqtt.c)
+            list(APPEND default_plugin_headers ${PROJECT_SOURCE_DIR}/plugins/mqtt/ua_mqtt_adapter.h)
+            list(APPEND default_plugin_sources ${PROJECT_SOURCE_DIR}/plugins/mqtt/ua_mqtt_adapter.c)
+        endif()
     endif()
 endif()
 
@@ -846,8 +855,8 @@ else()
             list(APPEND UA_FILE_NODESETS ${PROJECT_SOURCE_DIR}/tools/schema/Opc.Ua.NodeSet2.PubSubMinimal.xml)
         endif()
     endif()
-	if(UA_ENABLE_DA)
-		list(APPEND UA_FILE_DATATYPES ${PROJECT_SOURCE_DIR}/tools/schema/datatypes_dataaccess.txt)
+    if(UA_ENABLE_DA)
+        list(APPEND UA_FILE_DATATYPES ${PROJECT_SOURCE_DIR}/tools/schema/datatypes_dataaccess.txt)
     endif()
 endif()
 
@@ -1122,7 +1131,7 @@ include(linting_target)
 # specify install location with `-DCMAKE_INSTALL_PREFIX=xyz`
 # Enable shared library with `-DBUILD_SHARED_LIBS=ON`
 
-set(cmake_configfile_install ${CMAKE_INSTALL_LIBDIR}/cmake/open62541)
+set(cmake_configfile_install ${LIB_INSTALL_DIR}/cmake/open62541)
 set(open62541_install_tools_dir share/open62541/tools)
 set(open62541_install_nodeset_dir share/open62541/tools/ua-nodeset)
 
@@ -1170,8 +1179,8 @@ endif()
 # export library (either static or shared depending on BUILD_SHARED_LIBS)
 install(TARGETS open62541
         EXPORT open62541Targets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${LIB_INSTALL_DIR}
+        ARCHIVE DESTINATION ${LIB_INSTALL_DIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}
         INCLUDES DESTINATION include)
 
@@ -1217,7 +1226,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/open62541Config.cmake"
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     install(FILES "${PROJECT_BINARY_DIR}/src_generated/open62541.pc"
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+            DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
 endif()
 
 set(UA_install_tools_dirs "tools/certs"
@@ -1229,8 +1238,8 @@ set(UA_install_tools_files "tools/generate_datatypes.py"
     "tools/generate_nodeid_header.py"
     "tools/generate_statuscode_descriptions.py")
 
-install(DIRECTORY ${UA_install_tools_dirs} 
-    DESTINATION ${open62541_install_tools_dir} 
+install(DIRECTORY ${UA_install_tools_dirs}
+    DESTINATION ${open62541_install_tools_dir}
     USE_SOURCE_PERMISSIONS
     FILES_MATCHING
     PATTERN "*"
@@ -1267,7 +1276,7 @@ if(NOT UA_ENABLE_AMALGAMATION)
     endforeach()
 
 else()
-    # Export amalgamated header open62541.h which is generated due to build of 
+    # Export amalgamated header open62541.h which is generated due to build of
     # open62541-object
     install(FILES ${PROJECT_BINARY_DIR}/open62541.h DESTINATION include)
 endif()

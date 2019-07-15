@@ -20,6 +20,11 @@ _UA_BEGIN_DECLS
 
 #ifdef UA_ENABLE_PUBSUB /* conditional compilation */
 
+#ifdef UA_ENABLE_PUBSUB_MQTT
+/* Topic to be subscribed by the MQTT subcriber */
+char* mqttTopic;
+#endif
+
 /* forward declarations */
 struct UA_WriterGroup;
 typedef struct UA_WriterGroup UA_WriterGroup;
