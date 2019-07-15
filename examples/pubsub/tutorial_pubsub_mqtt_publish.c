@@ -37,6 +37,11 @@ static UA_Boolean useJson = false;
 static UA_NodeId connectionIdent;
 static UA_NodeId publishedDataSetIdent;
 static UA_NodeId writerGroupIdent;
+UA_NodeId counterVariable; /* Variable to write data into information model */
+UA_NodeId currentNodeId;
+
+UA_Variant variablePointer;
+UA_Int32 counterValue = 0;  /* Initialize counter value to zero */
 
 static void
 addPubSubConnection(UA_Server *server, char *addressUrl) {
@@ -88,7 +93,7 @@ addPublishedDataSet(UA_Server *server) {
  */
 static void
 addDataSetField(UA_Server *server) {
-    /* Add a field to the previous created PublishedDataSet */
+    /* Add fields to the previous created PublishedDataSet */
     UA_DataSetFieldConfig dataSetFieldConfig;
     memset(&dataSetFieldConfig, 0, sizeof(UA_DataSetFieldConfig));
     dataSetFieldConfig.dataSetFieldType = UA_PUBSUB_DATASETFIELD_VARIABLE;
@@ -99,6 +104,16 @@ addDataSetField(UA_Server *server) {
     UA_NODEID_NUMERIC(0, UA_NS0ID_SERVER_SERVERSTATUS_CURRENTTIME);
     dataSetFieldConfig.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldConfig, NULL);
+
+    UA_DataSetFieldConfig dataSetFieldConfigCounter;
+    memset(&dataSetFieldConfigCounter, 0, sizeof(UA_DataSetFieldConfig));
+    dataSetFieldConfigCounter.dataSetFieldType = UA_PUBSUB_DATASETFIELD_VARIABLE;
+
+    dataSetFieldConfigCounter.field.variable.fieldNameAlias = UA_STRING("Counter variable");
+    dataSetFieldConfigCounter.field.variable.promotedField = UA_FALSE;
+    dataSetFieldConfigCounter.field.variable.publishParameters.publishedVariable = counterVariable;
+    dataSetFieldConfigCounter.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
+    UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldConfigCounter, NULL);
 
 }
 
@@ -184,6 +199,12 @@ addDataSetWriter(UA_Server *server) {
 
     UA_Server_addDataSetWriter(server, writerGroupIdent, publishedDataSetIdent,
                                &dataSetWriterConfig, &dataSetWriterIdent);
+}
+
+static void publishCallback(UA_Server *server, void *data) {
+    UA_Variant_setScalar(&variablePointer, &counterValue, &UA_TYPES[UA_TYPES_INT32]);
+    UA_Server_writeValue(server, currentNodeId, variablePointer);
+    counterValue++;
 }
 
 /**
@@ -285,20 +306,43 @@ int main(int argc, char **argv) {
     UA_ServerConfig *config = UA_Server_getConfig(server);
     /* Details about the connection configuration and handling are located in the pubsub connection tutorial */
     UA_ServerConfig_setDefault(config);
-    config->pubsubTransportLayers = (UA_PubSubTransportLayer *) UA_malloc(1 * sizeof(UA_PubSubTransportLayer));
+     config->pubsubTransportLayers = (UA_PubSubTransportLayer *) UA_malloc(1 * sizeof(UA_PubSubTransportLayer));
     if(!config->pubsubTransportLayers) {
         return -1;
     }
     config->pubsubTransportLayers[0] = UA_PubSubTransportLayerMQTT();
     config->pubsubTransportLayersSize++;
 
+   /* Add an object and attributes of the object into the information model */
+    UA_NodeId counterId;
+    UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
+    oAttr.displayName         = UA_LOCALIZEDTEXT("en-US", "Counter Variable");
+    UA_Server_addObjectNode(server, UA_NODEID_NULL,
+                            UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
+                            UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
+                            UA_QUALIFIEDNAME(1, "Counter Variable"), UA_NODEID_NULL,
+                            oAttr, NULL, &counterId);
+
+    UA_VariableAttributes v1Attr = UA_VariableAttributes_default;
+    v1Attr.displayName = UA_LOCALIZEDTEXT("en-US", "Counter Variable");
+    v1Attr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
+    currentNodeId      = UA_NODEID_STRING(1, "Counter Variable");
+    UA_Server_addVariableNode(server, currentNodeId, counterId,
+                              UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
+                              UA_QUALIFIEDNAME(1, "Counter Variable"),
+                              UA_NODEID_NULL, v1Attr, NULL, &counterVariable);
+
     addPubSubConnection(server, addressUrl);
-    /* Assign the mqtt topic to the publisher */
+
+    /* call back function iteration for every 500ms interval */
+    UA_Server_addRepeatedCallback(server, publishCallback, NULL, interval, NULL);
+    /* Assign the mqtt Topic to the publisher */
     mqttTopic = topic;
     addPublishedDataSet(server);
     addDataSetField(server);
     addWriterGroup(server, interval);
     addDataSetWriter(server);
+
     UA_PubSubConnection *connection = UA_PubSubConnection_findConnectionbyId(server, connectionIdent);
 
     if(!connection) {

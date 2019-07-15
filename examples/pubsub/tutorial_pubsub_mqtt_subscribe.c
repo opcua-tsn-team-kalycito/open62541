@@ -164,21 +164,18 @@ static void fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
         UA_String strTmp = UA_STRING ("DataSet 1");
         UA_String_copy (&strTmp, &pMetaData->name);
 
-        /* Static definition of number of fields size to 4 to create four different
+        /* Static definition of number of fields size to 2 to create two different
          * targetVariables of distinct datatype
          * Currently the publisher sends only DateTime data type */
-        pMetaData->fieldsSize = 4;
+        pMetaData->fieldsSize = 2;
         pMetaData->fields = (UA_FieldMetaData*)UA_Array_new (pMetaData->fieldsSize,
                              &UA_TYPES[UA_TYPES_FIELDMETADATA]);
 
-        /* DateTime DataType */
-        initMetadata(0, strTmp, pMetaData, UA_TYPES_DATETIME, "DateTime", UA_NS0ID_DATETIME);
-        /* Int32 DataType */
-        initMetadata(1, strTmp, pMetaData, UA_TYPES_INT32, "Int32", UA_NS0ID_INT32);
         /* Int64 DataType */
-        initMetadata(2, strTmp, pMetaData, UA_TYPES_INT32, "Int32Fast", UA_NS0ID_INT32);
-        /* Boolean DataType */
-        initMetadata(3, strTmp, pMetaData, UA_TYPES_BOOLEAN, "BoolToggle", UA_NS0ID_BOOLEAN);
+        initMetadata(0, strTmp, pMetaData, UA_TYPES_INT32, "Counter Variable", UA_NS0ID_INT32);
+
+        /* DateTime DataType */
+        initMetadata(1, strTmp, pMetaData, UA_TYPES_DATETIME, "DateTime", UA_NS0ID_DATETIME);
     }
 }
 
@@ -191,7 +188,7 @@ static void fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
  *     :figwidth: 100 %
  *     :alt: OPC UA PubSub communication in wireshark
  *
- * The open62541 subscriber API will be released later. If you want to process the the datagrams,
+ * If you want to process the the datagrams,
  * take a look on the ua_network_pubsub_networkmessage.c which already contains the decoding code for UADP messages.
  *
  * It follows the main server code, making use of the above definitions. */
@@ -279,8 +276,8 @@ int main(int argc, char **argv) {
     /* Set up the server config */
     UA_Server *server = UA_Server_new();
     UA_ServerConfig *config = UA_Server_getConfig(server);
-    /* Details about the connection configuration and handling are located in the pubsub connection tutorial */
-    /* Run opc-ua server with port number 4801 */
+    /* Details about the connection configuration and handling are located in the pubsub connection tutorial
+     * Run opc-ua server with port number 4801 */
     UA_ServerConfig_setMinimal(config, 4801, NULL);
     config->pubsubTransportLayers = (UA_PubSubTransportLayer *) UA_malloc(1 * sizeof(UA_PubSubTransportLayer));
     if(!config->pubsubTransportLayers) {
