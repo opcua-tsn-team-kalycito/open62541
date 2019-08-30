@@ -554,9 +554,14 @@ UA_Server_removeDataSetField(UA_Server *server, const UA_NodeId dsf) {
     UA_free(currentField);
 
     //regenerate DataSetMetaData
-    for(size_t i = 0; i < parentPublishedDataSet->dataSetMetaData.fieldsSize; i++){
+    /* Removing this for loop as it is not needed here because if the fields are greater than 1
+     * it leads to deleting members for multiple times that leads to segmentation fault.
+     * Also UA_DataSetMetaDataType_deleteMembers already called before, hence the members would be
+     * already deleted.
+     */
+    /*for(size_t i = 0; i < parentPublishedDataSet->dataSetMetaData.fieldsSize; i++){
         UA_FieldMetaData_deleteMembers(&parentPublishedDataSet->dataSetMetaData.fields[i]);
-    }
+    }*/
     UA_free(parentPublishedDataSet->dataSetMetaData.fields);
     parentPublishedDataSet->dataSetMetaData.fieldsSize--;
     UA_FieldMetaData *fieldMetaData = (UA_FieldMetaData *) UA_calloc(parentPublishedDataSet->dataSetMetaData.fieldsSize,
@@ -625,6 +630,22 @@ UA_DataSetWriter_findDSWbyId(UA_Server *server, UA_NodeId identifier) {
             UA_DataSetWriter *tmpWriter;
             LIST_FOREACH(tmpWriter, &tmpWriterGroup->writers, listEntry){
                 if(UA_NodeId_equal(&tmpWriter->identifier, &identifier)){
+                    return tmpWriter;
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
+UA_DataSetWriter *
+UA_DataSetWriter_findDSWbyDSWId(UA_Server *server, UA_UInt16 dswId) {
+    for(size_t i = 0; i < server->pubSubManager.connectionsSize; i++){
+        UA_WriterGroup *tmpWriterGroup;
+        LIST_FOREACH(tmpWriterGroup, &server->pubSubManager.connections[i].writerGroups, listEntry){
+            UA_DataSetWriter *tmpWriter;
+            LIST_FOREACH(tmpWriter, &tmpWriterGroup->writers, listEntry){
+                if(tmpWriter->config.dataSetWriterId == dswId){
                     return tmpWriter;
                 }
             }

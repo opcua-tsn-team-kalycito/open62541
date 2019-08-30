@@ -201,12 +201,12 @@ UA_NetworkMessage_encodeBinary(const UA_NetworkMessage* src, UA_Byte **bufPos,
     if(src->payloadHeaderEnabled) {
         if(src->networkMessageType != UA_NETWORKMESSAGE_DATASET)
             return UA_STATUSCODE_BADNOTIMPLEMENTED;
-            
+
         rv = UA_Byte_encodeBinary(&(src->payloadHeader.dataSetPayloadHeader.count), bufPos, bufEnd);
 
         if(src->payloadHeader.dataSetPayloadHeader.dataSetWriterIds == NULL)
             return UA_STATUSCODE_BADENCODINGERROR;
-            
+
         for(UA_Byte i = 0; i < src->payloadHeader.dataSetPayloadHeader.count; i++) {
             rv = UA_UInt16_encodeBinary(&(src->payloadHeader.dataSetPayloadHeader.dataSetWriterIds[i]),
                                         bufPos, bufEnd);
@@ -281,36 +281,71 @@ UA_NetworkMessage_encodeBinary(const UA_NetworkMessage* src, UA_Byte **bufPos,
     }
 
     // Payload
-    if(src->networkMessageType != UA_NETWORKMESSAGE_DATASET)
-        return UA_STATUSCODE_BADNOTIMPLEMENTED;
-        
-    UA_Byte count = 1;
+    if(src->networkMessageType == UA_NETWORKMESSAGE_DATASET) {
+        UA_Byte count = 1;
+        if(src->payloadHeaderEnabled) {
+            count = src->payloadHeader.dataSetPayloadHeader.count;
+            if(count > 1) {
+                for (UA_Byte i = 0; i < count; i++) {
+                    // initially calculate the size, if not specified
+                    UA_UInt16 sz = 0;
+                    if((src->payload.dataSetPayload.sizes != NULL) &&
+                       (src->payload.dataSetPayload.sizes[i] != 0)) {
+                        sz = src->payload.dataSetPayload.sizes[i];
+                    } else {
+                        sz = (UA_UInt16)UA_DataSetMessage_calcSizeBinary(&src->payload.dataSetPayload.dataSetMessages[i]);
+                    }
 
-    if(src->payloadHeaderEnabled) {
-        count = src->payloadHeader.dataSetPayloadHeader.count;
-        if(count > 1) {
-            for (UA_Byte i = 0; i < count; i++) {
-                // initially calculate the size, if not specified
-                UA_UInt16 sz = 0;
-                if((src->payload.dataSetPayload.sizes != NULL) &&
-                   (src->payload.dataSetPayload.sizes[i] != 0)) {
-                    sz = src->payload.dataSetPayload.sizes[i];
-                } else {
-                    sz = (UA_UInt16)UA_DataSetMessage_calcSizeBinary(&src->payload.dataSetPayload.dataSetMessages[i]);
+                    rv = UA_UInt16_encodeBinary(&sz, bufPos, bufEnd);
+                    if(rv != UA_STATUSCODE_GOOD)
+                        return rv;
                 }
-
-                rv = UA_UInt16_encodeBinary(&sz, bufPos, bufEnd);
-                if(rv != UA_STATUSCODE_GOOD)
-                    return rv;
             }
         }
-    }
 
-    for(UA_Byte i = 0; i < count; i++) {
-        rv = UA_DataSetMessage_encodeBinary(&(src->payload.dataSetPayload.dataSetMessages[i]), bufPos, bufEnd);
+        for(UA_Byte i = 0; i < count; i++) {
+            rv = UA_DataSetMessage_encodeBinary(&(src->payload.dataSetPayload.dataSetMessages[i]), bufPos, bufEnd);
+            if(rv != UA_STATUSCODE_GOOD)
+                return rv;
+        }
+    }
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+    else if(src->networkMessageType == UA_NETWORKMESSAGE_DISCOVERY_RESPONSE) {
+        if(src->payload.discoveryResponsePayload.discoveryResponseHeader.discoveryResponseType != UA_DATASET_METADATA_MESSAGE)
+            return UA_STATUSCODE_BADNOTIMPLEMENTED;
+
+#ifdef UA_ENABLE_PUBSUB_METADATA
+        v = 0;
+        v |= (UA_Byte)src->payload.discoveryResponsePayload.discoveryResponseHeader.discoveryResponseType;
+        rv = UA_Byte_encodeBinary(&v, bufPos, bufEnd);
+        if(rv != UA_STATUSCODE_GOOD) {
+            return rv;
+        }
+
+        rv = UA_UInt16_encodeBinary(&(src->payload.discoveryResponsePayload.discoveryResponseHeader.sequenceNumber), bufPos, bufEnd);
+        if(rv != UA_STATUSCODE_GOOD) {
+            return rv;
+        }
+
+        /* TODO: Handling multiple datasetmetadata message when traffic reduction comes into place */
+        /* As of now, considering only one dataset writer and one datasetmetadata message */
+        rv = UA_UInt16_encodeBinary(&src->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.dataSetWriterId, bufPos, bufEnd);
         if(rv != UA_STATUSCODE_GOOD)
             return rv;
+
+        rv = UA_DataSetMetaDataType_encodeBinary(&src->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.dataSetMetaData, bufPos, bufEnd);
+        if(rv != UA_STATUSCODE_GOOD)
+            return rv;
+
+        rv = UA_StatusCode_encodeBinary(&src->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.statusCode, bufPos, bufEnd);
+        if(rv != UA_STATUSCODE_GOOD)
+            return rv;
+#endif
     }
+    else {
+        return UA_STATUSCODE_BADNOTIMPLEMENTED; //not implemented
+    }
+#endif
 
     if(src->securityEnabled) {
         // SecurityFooter
@@ -758,6 +793,24 @@ size_t UA_NetworkMessage_calcSizeBinary(const UA_NetworkMessage* p) {
         for (size_t i = 0; i < count; i++)
             size += UA_DataSetMessage_calcSizeBinary(&(p->payload.dataSetPayload.dataSetMessages[i]));
     }
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+    else if(p->networkMessageType == UA_NETWORKMESSAGE_DISCOVERY_RESPONSE) {
+        if(p->payload.discoveryResponsePayload.discoveryResponseHeader.discoveryResponseType != UA_DATASET_METADATA_MESSAGE)
+            return UA_STATUSCODE_BADNOTIMPLEMENTED;
+
+#ifdef UA_ENABLE_PUBSUB_METADATA
+        size += UA_Byte_calcSizeBinary(&byte); // For Discovery response type
+        size += UA_UInt16_calcSizeBinary(&p->payload.discoveryResponsePayload.discoveryResponseHeader.sequenceNumber);
+        /* TODO: Handling multiple datasetmetadata message when traffic reduction comes into place */
+        size += UA_calcSizeBinary(&p->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.dataSetWriterId, &UA_TYPES[UA_TYPES_UINT16]);
+        size += UA_DataSetMetaDataType_calcSizeBinary(&p->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.dataSetMetaData);
+        size += UA_calcSizeBinary(&p->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.statusCode, &UA_TYPES[UA_TYPES_STATUSCODE]);
+#endif
+    }
+    else {
+        //not implemented
+    }
+#endif
 
     if (p->securityEnabled) {
         if (p->securityHeader.securityFooterEnabled)

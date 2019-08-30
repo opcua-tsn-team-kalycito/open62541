@@ -239,6 +239,22 @@ if(UA_ENABLE_PUBSUB_INFORMATIONMODEL)
     endif()
 endif()
 
+option(UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE "Enable sending discovery request and response - PubSub" OFF)
+mark_as_advanced(UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE)
+if(UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE)
+    if(NOT UA_ENABLE_PUBSUB)
+        message(FATAL_ERROR "Discovery request and response cannot be used with PubSub function disabled.")
+    endif()
+endif()
+
+option(UA_ENABLE_PUBSUB_METADATA "Enable sending metadata in discovery request and response - PubSub" OFF)
+mark_as_advanced(UA_ENABLE_PUBSUB_METADATA)
+if(UA_ENABLE_PUBSUB_METADATA)
+    if(NOT UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE)
+        message(FATAL_ERROR "Metadata process cannot be used with discovery request and response function disabled.")
+    endif()
+endif()
+
 option(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING
        "Use a custom implementation for the publish callback handling" OFF)
 mark_as_advanced(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING)
@@ -607,6 +623,7 @@ set(internal_headers ${PROJECT_SOURCE_DIR}/deps/open62541_queue.h
                      ${PROJECT_SOURCE_DIR}/src/pubsub/ua_pubsub.h
                      ${PROJECT_SOURCE_DIR}/src/pubsub/ua_pubsub_manager.h
                      ${PROJECT_SOURCE_DIR}/src/pubsub/ua_pubsub_ns0.h
+                     ${PROJECT_SOURCE_DIR}/src/pubsub/ua_pubsub_discoveryreqres.h
                      ${PROJECT_SOURCE_DIR}/src/server/ua_server_internal.h
                      ${PROJECT_SOURCE_DIR}/src/server/ua_services.h
                      ${PROJECT_SOURCE_DIR}/src/client/ua_client_internal.h
@@ -639,6 +656,7 @@ set(lib_sources ${PROJECT_SOURCE_DIR}/src/ua_types.c
                 ${PROJECT_SOURCE_DIR}/src/pubsub/ua_pubsub_reader.c
                 ${PROJECT_SOURCE_DIR}/src/pubsub/ua_pubsub_manager.c
                 ${PROJECT_SOURCE_DIR}/src/pubsub/ua_pubsub_ns0.c
+                ${PROJECT_SOURCE_DIR}/src/pubsub/ua_pubsub_discoveryreqres.c
                 ${PROJECT_SOURCE_DIR}/src/server/ua_server_methodqueue.c
 				${PROJECT_SOURCE_DIR}/src/server/ua_asyncmethod_manager.c
                 # services

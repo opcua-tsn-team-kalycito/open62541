@@ -110,7 +110,9 @@ UA_StatusCode
 UA_DataSetWriterConfig_copy(const UA_DataSetWriterConfig *src, UA_DataSetWriterConfig *dst);
 UA_DataSetWriter *
 UA_DataSetWriter_findDSWbyId(UA_Server *server, UA_NodeId identifier);
-UA_StatusCode
+
+UA_DataSetWriter *
+UA_DataSetWriter_findDSWbyDSWId(UA_Server *server, UA_UInt16 dswId);UA_StatusCode
 UA_DataSetWriter_setPubSubState(UA_Server *server, UA_PubSubState state, UA_DataSetWriter *dataSetWriter);
 
 /**********************************************/

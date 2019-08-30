@@ -11,6 +11,10 @@
 #include <open62541/types.h>
 #include <open62541/types_generated.h>
 
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+#include <open62541/server_pubsub.h>
+#endif
+
 _UA_BEGIN_DECLS
 
 /* DataSet Payload Header */
@@ -25,6 +29,53 @@ typedef enum {
     UA_FIELDENCODING_RAWDATA = 1,
     UA_FIELDENCODING_DATAVALUE = 2
 } UA_FieldEncoding;
+
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+
+/* Discovery Response Type */
+typedef enum {
+    UA_RESERVED_MESSAGE = 0,
+    UA_PUBLISHER_ENDPOINT_MESSAGE = 1,
+    UA_DATASET_METADATA_MESSAGE = 2,
+    UA_DATASET_WRITER_CONFIGURATION_MESSAGE = 3,
+} UA_DiscoveryResponseType;
+
+/* Discovery Response Header */
+typedef struct {
+    UA_DiscoveryResponseType discoveryResponseType;
+    UA_UInt16 sequenceNumber;
+} UA_DiscoveryResponseHeader;
+
+/* PublisherEndpointsMessage */
+typedef struct {
+    UA_EndpointDescription* endpoints;
+    UA_StatusCode statusCode;
+} UA_PublisherEndpointsMessage;
+
+/* DataSetMetaDataMessage */
+typedef struct {
+    UA_UInt16 dataSetWriterId;
+    UA_DataSetMetaDataType dataSetMetaData;
+    UA_StatusCode statusCode;
+} UA_DataSetMetaDataMessage;
+
+/* DataSetWriterConfigurationMessage */
+typedef struct {
+    UA_UInt16* dataSetWriterId;
+    UA_DataSetWriterConfig dataSetWriterConfig;
+    UA_StatusCode* statusCode;
+} UA_DataSetWriterConfigurationMessage;
+
+typedef struct {
+    UA_DiscoveryResponseHeader discoveryResponseHeader;
+    union {
+        UA_PublisherEndpointsMessage publisherEndpointsMessage;
+        UA_DataSetMetaDataMessage dataSetMetaDataMessage;
+        UA_DataSetWriterConfigurationMessage dataSetWriterConfigurationMessage;
+    } discoveryResponseMessage;
+} UA_DiscoveryResponsePayload;
+
+#endif
 
 /* DataSetMessage Type */
 typedef enum {
@@ -103,6 +154,10 @@ UA_DataSetMessage_decodeBinary(const UA_ByteString *src, size_t *offset,
 
 size_t
 UA_DataSetMessage_calcSizeBinary(const UA_DataSetMessage* p);
+
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+void UA_DicoveryResponseMessage_free(UA_DiscoveryResponsePayload* p);
+#endif
 
 void UA_DataSetMessage_free(const UA_DataSetMessage* p);
 
@@ -196,6 +251,9 @@ typedef struct {
 
     union {
         UA_DataSetPayload dataSetPayload;
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+        UA_DiscoveryResponsePayload discoveryResponsePayload;
+#endif
     } payload;
     
     UA_ByteString securityFooter;
