@@ -22,6 +22,10 @@
 #include "ua_types_encoding_binary.h"
 #endif
 
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+#include "ua_pubsub_discoveryreqres.h"
+#endif
+
 #define UA_MAX_SIZENAME 64  /* Max size of Qualified Name of Subscribed Variable */
 
 /***************/
@@ -160,21 +164,28 @@ UA_ReaderGroupConfig_copy(const UA_ReaderGroupConfig *src,
 
 static UA_DataSetReader *
 checkReaderIdentifier(UA_Server *server, UA_NetworkMessage *pMsg, UA_DataSetReader *tmpReader) {
-    if(!pMsg->groupHeaderEnabled &&
-       !pMsg->groupHeader.writerGroupIdEnabled &&
-       !pMsg->payloadHeaderEnabled) {
-        UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER,
-                    "Cannot process DataSetReader without WriterGroup"
-                    "and DataSetWriter identifiers");
-        return NULL;
+    if(pMsg->networkMessageType == UA_NETWORKMESSAGE_DATASET) {
+        if(!pMsg->groupHeaderEnabled && !pMsg->groupHeader.writerGroupIdEnabled && !pMsg->payloadHeaderEnabled) {
+            UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "Cannot process DataSetReader without WriterGroup"
+                                               "and DataSetWriter identifiers");
+            return NULL;
+        }
+        else {
+            if((tmpReader->config.writerGroupId == pMsg->groupHeader.writerGroupId) &&
+                    (tmpReader->config.dataSetWriterId == *pMsg->payloadHeader.dataSetPayloadHeader.dataSetWriterIds)) {
+                UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "DataSetMessage - DataSetReader found. Process NetworkMessage");
+                return tmpReader;
+            }
+        }
     }
-
-    if((tmpReader->config.writerGroupId == pMsg->groupHeader.writerGroupId) &&
-       (tmpReader->config.dataSetWriterId == *pMsg->payloadHeader.dataSetPayloadHeader.dataSetWriterIds)) {
-        UA_LOG_DEBUG(&server->config.logger, UA_LOGCATEGORY_SERVER,
-                     "DataSetReader found. Process NetworkMessage");
-        return tmpReader;
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+    else if(pMsg->networkMessageType == UA_NETWORKMESSAGE_DISCOVERY_RESPONSE) {
+        if(tmpReader->config.dataSetWriterId == pMsg->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.dataSetWriterId) {
+            UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "DiscoveryResponse - DataSetReader found. Process NetworkMessage");
+            return tmpReader;
+        }
     }
+#endif
 
     return NULL;
 }
@@ -612,10 +623,11 @@ UA_Server_DataSetReader_process(UA_Server *server, UA_DataSetReader *dataSetRead
             }
 
             UA_StatusCode retVal = UA_STATUSCODE_GOOD;
-            for(UA_UInt16 i = 0; i < anzFields; i++) {
+            /* Fields are written in the reverse manner to the created target variables as we received the fields in revers manner(Data set ordering). */
+            for(UA_UInt16 i = 0, j = (UA_UInt16)(anzFields - 1); i < anzFields; i++, j--) {
                 if(dataSetMsg->data.keyFrameData.dataSetFields[i].hasValue) {
-                    if(dataSetReader->subscribedDataSetTarget.targetVariables[i].attributeId == UA_ATTRIBUTEID_VALUE) {
-                        retVal = UA_Server_writeValue(server, dataSetReader->subscribedDataSetTarget.targetVariables[i].targetNodeId, dataSetMsg->data.keyFrameData.dataSetFields[i].value);
+                    if(dataSetReader->subscribedDataSetTarget.targetVariables[j].attributeId == UA_ATTRIBUTEID_VALUE) {
+                        retVal = UA_Server_writeValue(server, dataSetReader->subscribedDataSetTarget.targetVariables[i].targetNodeId, dataSetMsg->data.keyFrameData.dataSetFields[j].value);
                         if(retVal != UA_STATUSCODE_GOOD) {
                             UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "Error Write Value KF %u: 0x%x", i, retVal);
                         }
@@ -683,16 +695,33 @@ UA_Server_processNetworkMessage(UA_Server *server, UA_NetworkMessage *pMsg,
         return UA_STATUSCODE_BADNOTFOUND; /* TODO: Check the return code */
     }
 
-    UA_LOG_DEBUG(&server->config.logger, UA_LOGCATEGORY_SERVER,
-                 "DataSetReader found with PublisherId");
+    if(pMsg->networkMessageType == UA_NETWORKMESSAGE_DATASET) {
+#ifdef UA_ENABLE_PUBSUB_METADATA
+        /* TODO: Dataset metadata check has to be modified */
+        if(!(dataSetReaderErg->config.dataSetMetaData.name.data)) {
+            UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "No dataset metadata message. Restart your publisher to get dataset metadata.");
+            return UA_STATUSCODE_BADNOTFOUND;
+        }
+#endif
 
-    UA_Byte anzDataSets = 1;
-    if(pMsg->payloadHeaderEnabled)
-        anzDataSets = pMsg->payloadHeader.dataSetPayloadHeader.count;
-    for(UA_Byte iterator = 0; iterator < anzDataSets; iterator++) {
-        UA_LOG_DEBUG(&server->config.logger, UA_LOGCATEGORY_SERVER, "Process Msg with DataSetReader!");
-        UA_Server_DataSetReader_process(server, dataSetReaderErg,
-                                        &pMsg->payload.dataSetPayload.dataSetMessages[iterator]);
+        UA_Byte anzDataSets = 1;
+        if(pMsg->payloadHeaderEnabled)
+            anzDataSets = pMsg->payloadHeader.dataSetPayloadHeader.count;
+        for(UA_Byte iterator = 0; iterator < anzDataSets; iterator++) {
+            UA_LOG_DEBUG(&server->config.logger, UA_LOGCATEGORY_SERVER, "Process Msg with DataSetReader!");
+            UA_Server_DataSetReader_process(server, dataSetReaderErg, &pMsg->payload.dataSetPayload.dataSetMessages[iterator]);
+        }
+    }
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+    else if (pMsg->networkMessageType == UA_NETWORKMESSAGE_DISCOVERY_RESPONSE) {
+        UA_StatusCode retval = UA_STATUSCODE_GOOD;
+        retval = UA_Server_processDiscoveryResponseMessage(server, pMsg, dataSetReaderErg);
+        if(retval != UA_STATUSCODE_GOOD)
+            return retval;
+    }
+#endif
+    else {
+        return UA_STATUSCODE_BADNOTIMPLEMENTED;
     }
 
     /* To Do Handle when dataSetReader parameters are null for publisherId

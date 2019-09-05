@@ -19,6 +19,10 @@ _UA_BEGIN_DECLS
 UA_StatusCode
 sendDiscoveryResponse(UA_Server *server, UA_Byte informationType, UA_UInt16 *writerGroupId);
 
+/* Process Discovery Response Message */
+UA_StatusCode
+UA_Server_processDiscoveryResponseMessage(UA_Server *server, UA_NetworkMessage* pMsg, UA_DataSetReader* dataSetReader);
+
 #endif /* UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE */
 
 #endif /* UA_ENABLE_PUBSUB */

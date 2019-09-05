@@ -16,6 +16,86 @@
 #define UA_MAX_STACKBUF 512 /* Max size of network messages on the stack */
 
 /**
+ * Process Discovery Response Message and create target variables in information model.
+ *
+ * @param server
+ * @param networkmessage
+ * @param datasetreader
+ * @return UA_STATUSCODE_GOOD on success
+ */
+UA_StatusCode
+UA_Server_processDiscoveryResponseMessage(UA_Server *server, UA_NetworkMessage *pMsg, UA_DataSetReader* dataSetReader) {
+    UA_StatusCode retval = UA_STATUSCODE_GOOD;
+    if (pMsg->payload.discoveryResponsePayload.discoveryResponseHeader.discoveryResponseType != UA_DATASET_METADATA_MESSAGE)
+         return UA_STATUSCODE_BADNOTIMPLEMENTED;
+
+#ifdef UA_ENABLE_PUBSUB_METADATA
+     if (dataSetReader->config.dataSetMetaData.configurationVersion.majorVersion ==
+             pMsg->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.dataSetMetaData.configurationVersion.majorVersion) {
+         UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "Already updated Dataset metadata.");
+         return UA_STATUSCODE_GOOD;
+     }
+
+     UA_DataSetMetaDataType tmpDataSetMetaData;
+     UA_DataSetMetaDataType_copy(&pMsg->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.dataSetMetaData, &tmpDataSetMetaData);
+
+     /* TODO: Dataset metadata message check has to be modified */
+     if (!(tmpDataSetMetaData.name.data)) {
+         UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER, "No Dataset metadata found");
+         return UA_STATUSCODE_BADBOUNDNOTFOUND;
+     }
+
+     /* Delete the old dataset reader metadata members if new one comes */
+     if (dataSetReader->config.dataSetMetaData.name.data)
+         UA_DataSetMetaDataType_deleteMembers(&dataSetReader->config.dataSetMetaData);
+
+     dataSetReader->config.dataSetMetaData = tmpDataSetMetaData;
+
+     char dsmdName[dataSetReader->config.dataSetMetaData.name.length + 1];
+     UA_snprintf(dsmdName, sizeof(dsmdName), "%.*s", (int)dataSetReader->config.dataSetMetaData.name.length, (const char*)dataSetReader->config.dataSetMetaData.name.data);
+
+     retval = UA_Server_deleteNode(server, UA_NODEID_STRING(1, dsmdName), true);
+     if (retval != UA_STATUSCODE_GOOD)
+         UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "Not possible to delete or empty node");
+     else
+         UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "Older Dataset metadata has been deleted.");
+
+     UA_NodeId folderId;
+     UA_String folderName = dataSetReader->config.dataSetMetaData.name;
+     UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
+     UA_QualifiedName folderBrowseName;
+     if(folderName.length > 0) {
+         oAttr.displayName.locale = UA_STRING ("en-US");
+         oAttr.displayName.text = folderName;
+         folderBrowseName.namespaceIndex = 1;
+         folderBrowseName.name = folderName;
+     }
+     else {
+         oAttr.displayName = UA_LOCALIZEDTEXT ("en-US", "Subscribed Variables");
+         folderBrowseName = UA_QUALIFIEDNAME (1, "Subscribed Variables");
+     }
+
+     /* Node ID value has been given as a metadata name instead of creating in random.
+      * By using this, the older objects can be deleted. TODO: Design has to be verified */
+     UA_Server_addObjectNode (server, UA_NODEID_STRING(1, dsmdName),
+                              UA_NODEID_NUMERIC (0, UA_NS0ID_OBJECTSFOLDER),
+                              UA_NODEID_NUMERIC (0, UA_NS0ID_ORGANIZES),
+                              folderBrowseName, UA_NODEID_NUMERIC (0,
+                              UA_NS0ID_BASEOBJECTTYPE), oAttr, NULL, &folderId);
+     retval |= UA_Server_DataSetReader_addTargetVariables (server, &folderId,
+                                                           dataSetReader->identifier,
+                                                           UA_PUBSUB_SDS_TARGET);
+     /* Delete the members */
+     UA_NodeId_deleteMembers(&folderId);
+
+     if (retval != UA_STATUSCODE_GOOD)
+         return retval;
+#endif
+
+     return retval;
+}
+
+/**
  * Generate a DiscoveryResponseMessage for the given writer.
  *
  * @param dataSetWriter ptr to corresponding writer

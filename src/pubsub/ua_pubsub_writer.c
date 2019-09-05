@@ -14,6 +14,10 @@
 
 #include "ua_pubsub.h"
 
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+#include "ua_pubsub_discoveryreqres.h"
+#endif
+
 #ifdef UA_ENABLE_PUBSUB_INFORMATIONMODEL
 #include "ua_pubsub_ns0.h"
 #endif

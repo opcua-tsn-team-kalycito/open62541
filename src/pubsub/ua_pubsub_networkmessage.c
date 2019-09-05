@@ -629,32 +629,64 @@ UA_NetworkMessage_decodeBinaryInternal(const UA_ByteString *src, size_t *offset,
     }
 
     // Payload
-    if(dst->networkMessageType != UA_NETWORKMESSAGE_DATASET)
-        return UA_STATUSCODE_BADNOTIMPLEMENTED;
-
-    UA_Byte count = 1;
-    if(dst->payloadHeaderEnabled) {
-        count = dst->payloadHeader.dataSetPayloadHeader.count;
-        if(count > 1) {
-            dst->payload.dataSetPayload.sizes = (UA_UInt16 *)UA_Array_new(count, &UA_TYPES[UA_TYPES_UINT16]);
-            for (UA_Byte i = 0; i < count; i++) {
-                rv = UA_UInt16_decodeBinary(src, offset, &(dst->payload.dataSetPayload.sizes[i]));
-                if(rv != UA_STATUSCODE_GOOD)
-                    return rv;
+    if(dst->networkMessageType == UA_NETWORKMESSAGE_DATASET) {
+        UA_Byte count = 1;
+        if(dst->payloadHeaderEnabled) {
+            count = dst->payloadHeader.dataSetPayloadHeader.count;
+            if(count > 1) {
+                dst->payload.dataSetPayload.sizes = (UA_UInt16 *)UA_Array_new(count, &UA_TYPES[UA_TYPES_UINT16]);
+                for (UA_Byte i = 0; i < count; i++) {
+                    rv = UA_UInt16_decodeBinary(src, offset, &(dst->payload.dataSetPayload.sizes[i]));
+                    if(rv != UA_STATUSCODE_GOOD)
+                        return rv;
+                }
             }
         }
-    }
 
-    dst->payload.dataSetPayload.dataSetMessages = (UA_DataSetMessage*)
-        UA_calloc(count, sizeof(UA_DataSetMessage));
-    for(UA_Byte i = 0; i < count; i++) {
-        rv = UA_DataSetMessage_decodeBinary(src, offset, &(dst->payload.dataSetPayload.dataSetMessages[i]));
+        dst->payload.dataSetPayload.dataSetMessages = (UA_DataSetMessage*)
+                                         UA_calloc(count, sizeof(UA_DataSetMessage));
+        for(UA_Byte i = 0; i < count; i++) {
+            rv  = UA_DataSetMessage_decodeBinary(src, offset, &(dst->payload.dataSetPayload.dataSetMessages[i]));
+            if(rv != UA_STATUSCODE_GOOD)
+                return rv;
+        }
+
         if(rv != UA_STATUSCODE_GOOD)
             return rv;
     }
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+    else if(dst->networkMessageType == UA_NETWORKMESSAGE_DISCOVERY_RESPONSE) {
+        v = 0;
+        rv = UA_Byte_decodeBinary(src, offset, &v);
+        if(rv != UA_STATUSCODE_GOOD)
+            return rv;
 
-    if(rv != UA_STATUSCODE_GOOD)
-        return rv;
+        if((v & UA_DATASET_METADATA_MESSAGE) == 0)
+            return UA_STATUSCODE_BADNOTIMPLEMENTED;
+
+#ifdef UA_ENABLE_PUBSUB_METADATA
+        dst->payload.discoveryResponsePayload.discoveryResponseHeader.discoveryResponseType = UA_DATASET_METADATA_MESSAGE;
+        rv = UA_UInt16_decodeBinary(src, offset, &dst->payload.discoveryResponsePayload.discoveryResponseHeader.sequenceNumber);
+        if(rv != UA_STATUSCODE_GOOD)
+            return rv;
+
+        rv = UA_UInt16_decodeBinary(src, offset, &dst->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.dataSetWriterId);
+        if(rv != UA_STATUSCODE_GOOD)
+            return rv;
+
+        rv = UA_DataSetMetaDataType_decodeBinary(src, offset, &dst->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.dataSetMetaData);
+        if(rv != UA_STATUSCODE_GOOD)
+            return rv;
+
+        rv = UA_StatusCode_decodeBinary(src, offset, &dst->payload.discoveryResponsePayload.discoveryResponseMessage.dataSetMetaDataMessage.statusCode);
+        if(rv != UA_STATUSCODE_GOOD)
+            return rv;
+#endif
+    }
+    else {
+        return UA_STATUSCODE_BADNOTIMPLEMENTED; // not implemented
+    }
+#endif
 
     if(dst->securityEnabled) {
         // SecurityFooter
@@ -856,6 +888,11 @@ UA_NetworkMessage_deleteMembers(UA_NetworkMessage* p) {
             UA_free(p->payload.dataSetPayload.dataSetMessages);
         }
     }
+#ifdef UA_ENABLE_PUBSUB_DISCOVERY_REQUESTRESPONSE
+    else if(p->networkMessageType == UA_NETWORKMESSAGE_DISCOVERY_RESPONSE) {
+        UA_DicoveryResponseMessage_free(&p->payload.discoveryResponsePayload);
+    }
+#endif
 
     if(p->securityHeader.securityFooterEnabled && (p->securityHeader.securityFooterSize > 0))
         UA_ByteString_deleteMembers(&p->securityFooter);
