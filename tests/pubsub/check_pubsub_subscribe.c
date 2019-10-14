@@ -558,6 +558,7 @@ START_TEST(SinglePublishSubscribeDateTime) {
         /* Data Set Reader */
         memset (&readerConfig, 0, sizeof (UA_DataSetReaderConfig));
         readerConfig.name = UA_STRING ("DataSetReader Test");
+        readerConfig.subscribedDataSetName = UA_STRING("Subscribed Variables");
         readerConfig.dataSetWriterId = DATASET_WRITER_ID;
         /* Setting up Meta data configuration in DataSetReader for DateTime DataType */
         UA_DataSetMetaDataType *pMetaData = &readerConfig.dataSetMetaData;
@@ -580,7 +581,7 @@ START_TEST(SinglePublishSubscribeDateTime) {
         ck_assert_int_eq(retVal, UA_STATUSCODE_GOOD);
         /* Add Subscribed Variables */
         UA_NodeId folderId;
-        UA_String folderName = readerConfig.dataSetMetaData.name;
+        UA_String folderName = readerConfig.subscribedDataSetName;
         UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
         UA_QualifiedName folderBrowseName;
         if (folderName.length > 0) {
@@ -692,12 +693,13 @@ START_TEST(SinglePublishSubscribeInt32) {
         /* Data Set Reader */
         /* Parameters to filter received NetworkMessage */
         memset (&readerConfig, 0, sizeof (UA_DataSetReaderConfig));
-        readerConfig.name             = UA_STRING ("DataSetReader Test");
-        UA_UInt16 publisherIdentifier = PUBLISHER_ID;
-        readerConfig.publisherId.type = &UA_TYPES[UA_TYPES_UINT16];
-        readerConfig.publisherId.data = &publisherIdentifier;
-        readerConfig.writerGroupId    = WRITER_GROUP_ID;
-        readerConfig.dataSetWriterId  = DATASET_WRITER_ID;
+        readerConfig.name                  = UA_STRING ("DataSetReader Test");
+        UA_UInt16 publisherIdentifier      = PUBLISHER_ID;
+        readerConfig.publisherId.type      = &UA_TYPES[UA_TYPES_UINT16];
+        readerConfig.publisherId.data      = &publisherIdentifier;
+        readerConfig.writerGroupId         = WRITER_GROUP_ID;
+        readerConfig.dataSetWriterId       = DATASET_WRITER_ID;
+        readerConfig.subscribedDataSetName = UA_STRING("Subscribed Variables");
         /* Setting up Meta data configuration in DataSetReader */
         UA_DataSetMetaDataType *pMetaData = &readerConfig.dataSetMetaData;
         /* FilltestMetadata function in subscriber implementation */
@@ -720,7 +722,7 @@ START_TEST(SinglePublishSubscribeInt32) {
         /* Add Subscribed Variables */
         UA_NodeId folderId;
         UA_NodeId newnodeId;
-        UA_String folderName      = readerConfig.dataSetMetaData.name;
+        UA_String folderName      = readerConfig.subscribedDataSetName;
         UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
         UA_QualifiedName folderBrowseName;
         if (folderName.length > 0) {
@@ -867,12 +869,13 @@ START_TEST(SinglePublishSubscribeInt64) {
         /* Data Set Reader */
         /* Parameters to filter received NetworkMessage */
         memset (&readerConfig, 0, sizeof (UA_DataSetReaderConfig));
-        readerConfig.name             = UA_STRING ("DataSetReader Test");
-        UA_UInt16 publisherIdentifier = PUBLISHER_ID;
-        readerConfig.publisherId.type = &UA_TYPES[UA_TYPES_UINT16];
-        readerConfig.publisherId.data = &publisherIdentifier;
-        readerConfig.writerGroupId    = WRITER_GROUP_ID;
-        readerConfig.dataSetWriterId  = DATASET_WRITER_ID;
+        readerConfig.name                  = UA_STRING ("DataSetReader Test");
+        UA_UInt16 publisherIdentifier      = PUBLISHER_ID;
+        readerConfig.publisherId.type      = &UA_TYPES[UA_TYPES_UINT16];
+        readerConfig.publisherId.data      = &publisherIdentifier;
+        readerConfig.writerGroupId         = WRITER_GROUP_ID;
+        readerConfig.dataSetWriterId       = DATASET_WRITER_ID;
+        readerConfig.subscribedDataSetName = UA_STRING("Subscribed Variables");
         /* Setting up Meta data configuration in DataSetReader */
         UA_DataSetMetaDataType *pMetaData = &readerConfig.dataSetMetaData;
         /* FilltestMetadata function in subscriber implementation */
@@ -895,7 +898,7 @@ START_TEST(SinglePublishSubscribeInt64) {
         /* Add Subscribed Variables */
         UA_NodeId folderId;
         UA_NodeId newnodeId;
-        UA_String folderName      = readerConfig.dataSetMetaData.name;
+        UA_String folderName      = readerConfig.subscribedDataSetName;
         UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
         UA_QualifiedName folderBrowseName;
         if (folderName.length > 0) {
@@ -1042,12 +1045,13 @@ START_TEST(SinglePublishSubscribeBool) {
         /* Data Set Reader */
         /* Parameters to filter received NetworkMessage */
         memset (&readerConfig, 0, sizeof (UA_DataSetReaderConfig));
-        readerConfig.name             = UA_STRING ("DataSetReader Test");
-        UA_UInt16 publisherIdentifier = PUBLISHER_ID;
-        readerConfig.publisherId.type = &UA_TYPES[UA_TYPES_UINT16];
-        readerConfig.publisherId.data = &publisherIdentifier;
-        readerConfig.writerGroupId    = WRITER_GROUP_ID;
-        readerConfig.dataSetWriterId  = DATASET_WRITER_ID;
+        readerConfig.name                  = UA_STRING ("DataSetReader Test");
+        UA_UInt16 publisherIdentifier      = PUBLISHER_ID;
+        readerConfig.publisherId.type      = &UA_TYPES[UA_TYPES_UINT16];
+        readerConfig.publisherId.data      = &publisherIdentifier;
+        readerConfig.writerGroupId         = WRITER_GROUP_ID;
+        readerConfig.dataSetWriterId       = DATASET_WRITER_ID;
+        readerConfig.subscribedDataSetName = UA_STRING("Subscribed Variables");
         /* Setting up Meta data configuration in DataSetReader */
         UA_DataSetMetaDataType *pMetaData = &readerConfig.dataSetMetaData;
         /* FilltestMetadata function in subscriber implementation */
@@ -1070,7 +1074,7 @@ START_TEST(SinglePublishSubscribeBool) {
         /* Add Subscribed Variables */
         UA_NodeId folderId;
         UA_NodeId newnodeId;
-        UA_String folderName      = readerConfig.dataSetMetaData.name;
+        UA_String folderName      = readerConfig.subscribedDataSetName;
         UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
         UA_QualifiedName folderBrowseName;
         if (folderName.length > 0) {
@@ -1218,12 +1222,13 @@ START_TEST(SinglePublishSubscribewithValidIdentifiers) {
         /* Data Set Reader */
         /* Parameters to filter received NetworkMessage */
         memset (&readerConfig, 0, sizeof (UA_DataSetReaderConfig));
-        readerConfig.name             = UA_STRING ("DataSetReader Test");
-        UA_UInt16 publisherIdentifier = PUBLISHER_ID;
-        readerConfig.publisherId.type = &UA_TYPES[UA_TYPES_UINT16];
-        readerConfig.publisherId.data = &publisherIdentifier;
-        readerConfig.writerGroupId    = WRITER_GROUP_ID;
-        readerConfig.dataSetWriterId  = DATASET_WRITER_ID;
+        readerConfig.name                  = UA_STRING ("DataSetReader Test");
+        readerConfig.subscribedDataSetName = UA_STRING("Subscribed Variables");
+        UA_UInt16 publisherIdentifier      = PUBLISHER_ID;
+        readerConfig.publisherId.type      = &UA_TYPES[UA_TYPES_UINT16];
+        readerConfig.publisherId.data      = &publisherIdentifier;
+        readerConfig.writerGroupId         = WRITER_GROUP_ID;
+        readerConfig.dataSetWriterId       = DATASET_WRITER_ID;
         /* Setting up Meta data configuration in DataSetReader */
         UA_DataSetMetaDataType *pMetaData = &readerConfig.dataSetMetaData;
         /* FilltestMetadata function in subscriber implementation */
@@ -1246,7 +1251,7 @@ START_TEST(SinglePublishSubscribewithValidIdentifiers) {
         /* Add Subscribed Variables */
         UA_NodeId folderId;
         UA_NodeId newnodeId;
-        UA_String folderName      = readerConfig.dataSetMetaData.name;
+        UA_String folderName      = readerConfig.subscribedDataSetName;
         UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
         UA_QualifiedName folderBrowseName;
         if (folderName.length > 0) {

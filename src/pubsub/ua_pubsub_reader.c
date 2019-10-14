@@ -434,6 +434,11 @@ UA_DataSetReaderConfig_copy(const UA_DataSetReaderConfig *src,
     if(retVal != UA_STATUSCODE_GOOD) {
         return retVal;
     }
+    /* Copy the user-defined subscribedDataSetName */
+    retVal = UA_String_copy(&src->subscribedDataSetName, &dst->subscribedDataSetName);
+    if(retVal != UA_STATUSCODE_GOOD) {
+        return retVal;
+    }
 
     retVal = UA_Variant_copy(&src->publisherId, &dst->publisherId);
     if(retVal != UA_STATUSCODE_GOOD) {
@@ -619,11 +624,12 @@ UA_Server_DataSetReader_process(UA_Server *server, UA_DataSetReader *dataSetRead
             for(UA_UInt16 i = 0; i < anzFields; i++) {
                 if(dataSetMsg->data.keyFrameData.dataSetFields[i].hasValue) {
                     if(dataSetReader->subscribedDataSetTarget.targetVariables[i].attributeId == UA_ATTRIBUTEID_VALUE) {
+#ifdef UA_ENABLE_PUBSUB_INFORMATIONMODEL
                         retVal = UA_Server_writeValue(server, dataSetReader->subscribedDataSetTarget.targetVariables[i].targetNodeId, dataSetMsg->data.keyFrameData.dataSetFields[i].value);
                         if(retVal != UA_STATUSCODE_GOOD) {
                             UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "Error Write Value KF %u: 0x%x", i, retVal);
                         }
-
+#endif
                     }
                     else {
                         UA_WriteValue writeVal;
@@ -651,6 +657,7 @@ UA_Server_DataSetReader_process(UA_Server *server, UA_DataSetReader *dataSetRead
 void UA_DataSetReader_delete(UA_Server *server, UA_DataSetReader *dataSetReader) {
     /* Delete DataSetReader config */
     UA_String_deleteMembers(&dataSetReader->config.name);
+    UA_String_deleteMembers(&dataSetReader->config.subscribedDataSetName);
     UA_Variant_deleteMembers(&dataSetReader->config.publisherId);
     UA_DataSetMetaDataType_deleteMembers(&dataSetReader->config.dataSetMetaData);
     UA_UadpDataSetReaderMessageDataType_deleteMembers(&dataSetReader->config.messageSettings);

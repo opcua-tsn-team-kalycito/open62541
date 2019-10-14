@@ -92,53 +92,17 @@ addDataSetReader(UA_Server *server) {
     /* The following parameters are used to show that the data published by
      * tutorial_pubsub_publish.c is being subscribed and is being updated in
      * the information model */
-    UA_UInt16 publisherIdentifier = 2234;
-    readerConfig.publisherId.type = &UA_TYPES[UA_TYPES_UINT16];
-    readerConfig.publisherId.data = &publisherIdentifier;
-    readerConfig.writerGroupId    = 100;
-    readerConfig.dataSetWriterId  = 62541;
+    UA_UInt16 publisherIdentifier      = 2234;
+    readerConfig.publisherId.type      = &UA_TYPES[UA_TYPES_UINT16];
+    readerConfig.publisherId.data      = &publisherIdentifier;
+    readerConfig.writerGroupId         = 100;
+    readerConfig.dataSetWriterId       = 62541;
+    readerConfig.subscribedDataSetName = UA_STRING("Subscribed Variables");
 
     /* Setting up Meta data configuration in DataSetReader */
     fillTestDataSetMetaData(&readerConfig.dataSetMetaData);
     retval |= UA_Server_addDataSetReader(server, readerGroupIdentifier, &readerConfig,
                                          &readerIdentifier);
-    return retval;
-}
-
-/* Set SubscribedDataSet type to TargetVariables data type
- * Add subscribedvariables to the DataSetReader */
-static UA_StatusCode
-addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId) {
-    if(server == NULL) {
-        return UA_STATUSCODE_BADINTERNALERROR;
-    }
-
-    UA_StatusCode retval = UA_STATUSCODE_GOOD;
-    UA_NodeId folderId;
-    UA_String folderName = readerConfig.dataSetMetaData.name;
-    UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
-    UA_QualifiedName folderBrowseName;
-    if(folderName.length > 0) {
-        oAttr.displayName.locale = UA_STRING ("en-US");
-        oAttr.displayName.text = folderName;
-        folderBrowseName.namespaceIndex = 1;
-        folderBrowseName.name = folderName;
-    }
-    else {
-        oAttr.displayName = UA_LOCALIZEDTEXT ("en-US", "Subscribed Variables");
-        folderBrowseName = UA_QUALIFIEDNAME (1, "Subscribed Variables");
-    }
-
-    UA_Server_addObjectNode (server, UA_NODEID_NULL,
-                             UA_NODEID_NUMERIC (0, UA_NS0ID_OBJECTSFOLDER),
-                             UA_NODEID_NUMERIC (0, UA_NS0ID_ORGANIZES),
-                             folderBrowseName, UA_NODEID_NUMERIC (0,
-                             UA_NS0ID_BASEOBJECTTYPE), oAttr, NULL, &folderId);
-
-    retval |= UA_Server_DataSetReader_addTargetVariables (server, &folderId,
-                                                          dataSetReaderId,
-                                                          UA_PUBSUB_SDS_TARGET);
-    UA_free(readerConfig.dataSetMetaData.fields);
     return retval;
 }
 
@@ -241,12 +205,10 @@ run(UA_String *transportProfile, UA_NetworkAddressUrlDataType *networkAddressUrl
     if (retval != UA_STATUSCODE_GOOD)
         return EXIT_FAILURE;
 
-    /* Add SubscribedVariables to the created DataSetReader */
-    retval |= addSubscribedVariables(server, readerIdentifier);
-    if (retval != UA_STATUSCODE_GOOD)
-        return EXIT_FAILURE;
-
     retval = UA_Server_run(server, &running);
+
+    /* Free the memory allocated for metaData fields */
+    UA_free(readerConfig.dataSetMetaData.fields);
     UA_Server_delete(server);
     return retval == UA_STATUSCODE_GOOD ? EXIT_SUCCESS : EXIT_FAILURE;
 }

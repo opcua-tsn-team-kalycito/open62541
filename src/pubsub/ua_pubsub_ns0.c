@@ -432,7 +432,8 @@ removeConnectionAction(UA_Server *server,
 UA_StatusCode
 addDataSetReaderRepresentation(UA_Server *server, UA_DataSetReader *dataSetReader){
     UA_StatusCode retVal = UA_STATUSCODE_GOOD;
-    UA_NodeId publisherIdNode, writerGroupIdNode, dataSetwriterIdNode;
+    UA_NodeId targetNodeId;
+    UA_NodeId publisherIdNode, writerGroupIdNode, dataSetwriterIdNode, subscribedDataSetNode;
 
     /* Display DataSetReaderName */
     if(dataSetReader->config.name.length > UA_MAX_STRLENGTH)
@@ -441,28 +442,53 @@ addDataSetReaderRepresentation(UA_Server *server, UA_DataSetReader *dataSetReade
     memcpy(dsrName, dataSetReader->config.name.data, dataSetReader->config.name.length);
     dsrName[dataSetReader->config.name.length] = NULL_TERMINATING_STRING;
     //This code block must use a lock
-    UA_Nodestore_removeNode(server->nsCtx, &dataSetReader->identifier);
+    UA_NODESTORE_REMOVE(server, &dataSetReader->identifier);
     retVal |= addPubSubObjectNode(server, dsrName, dataSetReader->identifier.identifier.numeric,
                                    dataSetReader->linkedReaderGroup.identifier.numeric,
                                    UA_NS0ID_HASDATASETREADER, UA_NS0ID_DATASETREADERTYPE);
     //End lock zone
 
-    /* Add childNodes such as PublisherId, WriterGroupId and DataSetWriterId in DataSetReader object */
-    publisherIdNode = findSingleChildNode(server, UA_QUALIFIEDNAME(0, "PublisherId"),
+    /* Add childNodes such as PublisherId, WriterGroupId, DataSetWriterId and SubscribedDataSet in DataSetReader object */
+    publisherIdNode       = findSingleChildNode(server, UA_QUALIFIEDNAME(0, "PublisherId"),
                                            UA_NODEID_NUMERIC(0, UA_NS0ID_HASPROPERTY),
                                            UA_NODEID_NUMERIC(0, dataSetReader->identifier.identifier.numeric));
-    writerGroupIdNode = findSingleChildNode(server, UA_QUALIFIEDNAME(0, "WriterGroupId"),
+    writerGroupIdNode     = findSingleChildNode(server, UA_QUALIFIEDNAME(0, "WriterGroupId"),
                                              UA_NODEID_NUMERIC(0, UA_NS0ID_HASPROPERTY),
                                              UA_NODEID_NUMERIC(0, dataSetReader->identifier.identifier.numeric));
-    dataSetwriterIdNode = findSingleChildNode(server, UA_QUALIFIEDNAME(0, "DataSetWriterId"),
+    dataSetwriterIdNode   = findSingleChildNode(server, UA_QUALIFIEDNAME(0, "DataSetWriterId"),
                                                UA_NODEID_NUMERIC(0, UA_NS0ID_HASPROPERTY),
                                                UA_NODEID_NUMERIC(0, dataSetReader->identifier.identifier.numeric));
+    subscribedDataSetNode = findSingleChildNode(server, UA_QUALIFIEDNAME(0, "SubscribedDataSet"),
+                                                 UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
+                                                 UA_NODEID_NUMERIC(0, dataSetReader->identifier.identifier.numeric));
 
     if(UA_NodeId_equal(&publisherIdNode, &UA_NODEID_NULL)
         || UA_NodeId_equal(&writerGroupIdNode, &UA_NODEID_NULL)
-        || UA_NodeId_equal(&dataSetwriterIdNode, &UA_NODEID_NULL)){
+        || UA_NodeId_equal(&dataSetwriterIdNode, &UA_NODEID_NULL)
+        || UA_NodeId_equal(&subscribedDataSetNode, &UA_NODEID_NULL)){
         return UA_STATUSCODE_BADNOTFOUND;
     }
+
+    /* Get the SubscribedDataSet name */
+    UA_String sdsName = dataSetReader->config.subscribedDataSetName;
+    UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
+    UA_QualifiedName sdsBrowseName = {0, UA_STRING_NULL};
+    if(sdsName.length > 0) {
+       oAttr.displayName.locale = UA_STRING ("en-US");
+       oAttr.displayName.text = sdsName;
+       sdsBrowseName.namespaceIndex = 1;
+       sdsBrowseName.name = sdsName;
+    }
+
+    /* Add object node under SubscribedDataSet */
+    UA_Server_addObjectNode (server, UA_NODEID_NULL, subscribedDataSetNode,
+                             UA_NODEID_NUMERIC (0, UA_NS0ID_ORGANIZES),
+                             sdsBrowseName, UA_NODEID_NUMERIC (0,
+                             UA_NS0ID_BASEOBJECTTYPE), oAttr, NULL, &targetNodeId);
+
+    /* TODO: To handle mirror variable representation using information model
+     * Add subscribedvariables to the DataSetReader */
+    retVal |= UA_Server_DataSetReader_addTargetVariables (server, &targetNodeId, dataSetReader->identifier, UA_PUBSUB_SDS_TARGET);
 
     UA_NodePropertyContext *dataSetReaderPublisherIdContext = (UA_NodePropertyContext *) UA_malloc(sizeof(UA_NodePropertyContext));
     dataSetReaderPublisherIdContext->parentNodeId = dataSetReader->identifier;
@@ -968,7 +994,7 @@ addReaderGroupRepresentation(UA_Server *server, UA_ReaderGroup *readerGroup){
     memcpy(rgName, readerGroup->config.name.data, readerGroup->config.name.length);
     rgName[readerGroup->config.name.length] = NULL_TERMINATING_STRING;
     //This code block must use a lock
-    UA_Nodestore_removeNode(server->nsCtx, &readerGroup->identifier);
+    UA_NODESTORE_REMOVE(server, &readerGroup->identifier);
 
     /* Add object ReaderGroup under PubSubConnectionType object */
     retVal |= addPubSubObjectNode(server, rgName, readerGroup->identifier.identifier.numeric,

@@ -460,6 +460,7 @@ typedef struct {
     UA_PubSubSecurityParameters securityParameters;
     UA_UadpDataSetReaderMessageDataType messageSettings;
     UA_TargetVariablesDataType subscribedDataSetTarget;
+    UA_String subscribedDataSetName;
 } UA_DataSetReaderConfig;
 
 /* Update configuration to the dataSetReader */
