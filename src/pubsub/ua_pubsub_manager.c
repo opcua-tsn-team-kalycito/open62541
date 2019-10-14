@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2017-2018 Fraunhofer IOSB (Author: Andreas Ebner)
  * Copyright (c) 2018 Fraunhofer IOSB (Author: Julius Pfrommer)
+ * Copyright (c) 2019 Kalycito Infotech Private Limited
  */
 
 #include "server/ua_server_internal.h"
@@ -142,6 +143,10 @@ UA_Server_removePubSubConnection(UA_Server *server, const UA_NodeId connection) 
         for(size_t n = 0; n < server->pubSubManager.connectionsSize; n++){
             if(server->pubSubManager.connections[n].writerGroups.lh_first){
                 server->pubSubManager.connections[n].writerGroups.lh_first->listEntry.le_prev = &server->pubSubManager.connections[n].writerGroups.lh_first;
+            }
+            /* Fix memory issue caused by reallocation of PubSub connection */
+            if(server->pubSubManager.connections[n].readerGroups.lh_first){
+            server->pubSubManager.connections[n].readerGroups.lh_first->listEntry.le_prev = &server->pubSubManager.connections[n].readerGroups.lh_first;
             }
         }
     }
