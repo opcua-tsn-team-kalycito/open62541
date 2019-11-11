@@ -303,7 +303,7 @@ UA_PubSubChannelUDPMC_open(const UA_PubSubConnectionConfig *connectionConfig) {
     if (setsockopt(newChannel->sockfd, SOL_SOCKET, SOCKET_TRANSMISSION_TIME, &txtimeSocket, sizeof(txtimeSocket))) {
         PRINT_ERROR("setsockopt SOCKET_TRANSMISSION_TIME failed");
     }
-
+    /* TODO: Set SO_PRIORITY through command line argument from application instead of hardcoding */
     if (setsockopt(newChannel->sockfd, SOL_SOCKET, SO_PRIORITY, &soPriority, sizeof(int))) {
         perror("setsockopt SO_PRIORITY failed: %m");
     }
@@ -343,8 +343,7 @@ UA_PubSubChannelUDPMC_regist(UA_PubSubChannel *channel, UA_ExtensionObject *tran
          */
 #ifndef UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING
         groupV4.imr_interface.s_addr = UA_htonl(INADDR_ANY);
-#endif
-#ifdef UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING
+#else
         groupV4.imr_interface.s_addr = inet_addr(PUBSUB_IP_ADDRESS);
 #endif
         //multihomed hosts can join several groups on different IF, INADDR_ANY -> kernel decides
@@ -422,9 +421,7 @@ UA_PubSubChannelUDPMC_send(UA_PubSubChannel *channel, UA_ExtensionObject *transp
         }
         nWritten += n;
     }
-#endif
-
-#ifdef UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING
+#else
      txtimecalc_udp(channel, transportSettigns, buf);
 #endif
 
