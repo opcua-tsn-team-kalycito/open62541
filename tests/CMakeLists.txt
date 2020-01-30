@@ -130,6 +130,14 @@ endmacro()
 
 add_custom_target(test-verbose COMMAND ${CMAKE_CTEST_COMMAND} --verbose)
 
+# Link custom manager
+if(UA_ENABLE_PUBSUB)
+    if(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING)
+        add_library(ua_pubsub_custom_manager_source ${PROJECT_SOURCE_DIR}/src/pubsub/ua_pubsub_custom_manager.c)
+         list(APPEND LIBS ua_pubsub_custom_manager_source)
+    endif()
+endif()
+
 # the unit test are built directly on the open62541 object files. so they can
 # access symbols that are hidden/not exported to the shared library
 
@@ -336,6 +344,21 @@ if(UA_ENABLE_PUBSUB)
     add_executable(check_pubsub_multiple_layer pubsub/check_pubsub_multiple_layer.c $<TARGET_OBJECTS:open62541-object> $<TARGET_OBJECTS:open62541-plugins>)
     target_link_libraries(check_pubsub_multiple_layer ${LIBS})
     add_test_valgrind(pubsub_multiple_layer ${TESTS_BINARY_DIR}/check_pubsub_multiple_layer)
+    if(UA_ENABLE_PUBSUB_ETH_UADP)
+        if(NOT UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING)
+            add_executable(check_pubsub_connection_ethernet pubsub/check_pubsub_connection_ethernet.c $<TARGET_OBJECTS:open62541-object> $<TARGET_OBJECTS:open62541-plugins>)
+            target_link_libraries(check_pubsub_connection_ethernet ${LIBS})
+            add_test_valgrind(pubsub_connection_ethernet ${TESTS_BINARY_DIR}/check_pubsub_connection_ethernet)
+            add_executable(check_pubsub_publish_ethernet pubsub/check_pubsub_publish_ethernet.c $<TARGET_OBJECTS:open62541-object> $<TARGET_OBJECTS:open62541-plugins>)
+            target_link_libraries(check_pubsub_publish_ethernet ${LIBS})
+            add_test_valgrind(pubsub_publish_ethernet ${TESTS_BINARY_DIR}/check_pubsub_publish_ethernet)
+        endif()
+        if(UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING)
+            add_executable(check_pubsub_publish_realtime_ethernet pubsub/check_pubsub_publish_realtime_ethernet.c $<TARGET_OBJECTS:open62541-object> $<TARGET_OBJECTS:open62541-plugins>)
+            target_link_libraries(check_pubsub_publish_realtime_ethernet ${LIBS})
+            add_test_valgrind(pubsub_publish_realtime_ethernet ${TESTS_BINARY_DIR}/check_pubsub_publish_realtime_ethernet)
+        endif()
+    endif()
 
     if(UA_ENABLE_PUBSUB_INFORMATIONMODEL)
         add_executable(check_pubsub_informationmodel pubsub/check_pubsub_informationmodel.c $<TARGET_OBJECTS:open62541-object> $<TARGET_OBJECTS:open62541-plugins>)

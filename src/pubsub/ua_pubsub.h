@@ -140,6 +140,16 @@ UA_WriterGroup_findWGbyId(UA_Server *server, UA_NodeId identifier);
 UA_StatusCode
 UA_WriterGroup_setPubSubState(UA_Server *server, UA_PubSubState state, UA_WriterGroup *writerGroup);
 
+UA_StatusCode
+generateNetworkMessage(UA_PubSubConnection *connection, UA_WriterGroup *wg,
+                       UA_DataSetMessage *dsm, UA_UInt16 *writerIds, UA_Byte dsmCount,
+                       UA_ExtensionObject *messageSettings,
+                       UA_ExtensionObject *transportSettings,
+                       UA_NetworkMessage *networkMessage);
+UA_StatusCode
+UA_DataSetWriter_generateDataSetMessage(UA_Server *server, UA_DataSetMessage *dataSetMessage,
+                                        UA_DataSetWriter *dataSetWriter);
+
 /**********************************************/
 /*               DataSetField                 */
 /**********************************************/

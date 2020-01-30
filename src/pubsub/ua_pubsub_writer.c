@@ -30,15 +30,6 @@ static void
 UA_WriterGroup_clear(UA_Server *server, UA_WriterGroup *writerGroup);
 static void
 UA_DataSetField_clear(UA_DataSetField *field);
-static UA_StatusCode
-generateNetworkMessage(UA_PubSubConnection *connection, UA_WriterGroup *wg,
-                       UA_DataSetMessage *dsm, UA_UInt16 *writerIds, UA_Byte dsmCount,
-                       UA_ExtensionObject *messageSettings,
-                       UA_ExtensionObject *transportSettings,
-                       UA_NetworkMessage *networkMessage);
-static UA_StatusCode
-UA_DataSetWriter_generateDataSetMessage(UA_Server *server, UA_DataSetMessage *dataSetMessage,
-                                        UA_DataSetWriter *dataSetWriter);
 
 /**********************************************/
 /*               Connection                   */
@@ -1556,7 +1547,7 @@ UA_PubSubDataSetWriter_generateDeltaFrameMessage(UA_Server *server,
  * @param dataSetWriter ptr to corresponding writer
  * @return ptr to generated DataSetMessage
  */
-static UA_StatusCode
+UA_StatusCode
 UA_DataSetWriter_generateDataSetMessage(UA_Server *server, UA_DataSetMessage *dataSetMessage,
                                         UA_DataSetWriter *dataSetWriter) {
     UA_PublishedDataSet *currentDataSet =
@@ -1804,7 +1795,7 @@ sendNetworkMessageJson(UA_PubSubConnection *connection, UA_DataSetMessage *dsm,
     return retval;
 }
 
-static UA_StatusCode
+UA_StatusCode
 generateNetworkMessage(UA_PubSubConnection *connection, UA_WriterGroup *wg,
                        UA_DataSetMessage *dsm, UA_UInt16 *writerIds, UA_Byte dsmCount,
                        UA_ExtensionObject *messageSettings,
