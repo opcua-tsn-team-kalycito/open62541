@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
  * Copyright (c) 2017-2018 Fraunhofer IOSB (Author: Andreas Ebner)
- * Copyright (c) 2019 Kalycito Infotech Private Limited
+ * Copyright (c) 2019-2020 Kalycito Infotech Private Limited
  */
 
 #ifndef UA_SERVER_PUBSUB_H
@@ -117,6 +117,13 @@ typedef struct {
 } UA_ETFConfiguration;
 #endif
 
+#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP
+typedef struct {
+    UA_UInt32 xdp_flags;
+    UA_UInt32 hw_receive_queue;
+} UA_XDPConfiguration;
+#endif
+
 typedef struct {
     UA_String name;
     UA_Boolean enabled;
@@ -137,6 +144,11 @@ typedef struct {
 #ifdef UA_ENABLE_PUBSUB_ETH_UADP_ETF
     /* ETF related connection configuration - Not in PubSub specfication */
     UA_ETFConfiguration etfConfiguration;
+#endif
+
+#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP
+    /* XDP related configuration for xdp flag and queue - Not a std. in pubsub specification */
+    UA_XDPConfiguration xdpConfiguration;
 #endif
 } UA_PubSubConnectionConfig;
 

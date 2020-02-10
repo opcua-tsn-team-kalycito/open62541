@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
  * Copyright (c) 2017-2018 Fraunhofer IOSB (Author: Andreas Ebner)
+ * Copyright (c) 2019-2020 Kalycito Infotech Private Limited
  */
 
 #ifndef UA_PLUGIN_PUBSUB_H_
@@ -47,6 +48,9 @@ struct UA_PubSubChannel {
     UA_PubSubChannelState state;
     UA_PubSubConnectionConfig *connectionConfig; /* link to parent connection config */
     UA_SOCKET sockfd;
+#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP
+    struct xdpsock *xdpsocket; /* AF_XDP socket */
+#endif
     void *handle; /* implementation specific data */
     /*@info for handle: each network implementation should provide an structure
     * UA_PubSubChannelData[ImplementationName] This structure can be used by the
