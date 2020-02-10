@@ -17,14 +17,14 @@
 #include <open62541/plugin/log_stdout.h>
 #include <open62541/plugin/pubsub_ethernet.h>
 #include <open62541/util.h>
-#if defined(__vxworks) || defined(__VXWORKS__)
+/*#if defined(__vxworks) || defined(__VXWORKS__)
 #include <netpacket/packet.h>
 #include <netinet/if_ether.h>
 #define ETH_ALEN ETHER_ADDR_LEN
 #else
 #include <linux/if_packet.h>
 #include <netinet/ether.h>
-#endif
+#endif*/
 
 #include <linux/types.h>
 #include <time.h>
@@ -49,13 +49,13 @@
 struct sockaddr_ll sll = { 0 };
 
 /* Ethernet network layer specific internal data */
-typedef struct {
+/*typedef struct {
     int ifindex;
     UA_UInt16 vid;
     UA_Byte prio;
     UA_Byte ifAddress[ETH_ALEN];
     UA_Byte targetAddress[ETH_ALEN];
-} UA_PubSubChannelDataEthernet;
+} UA_PubSubChannelDataEthernet;*/
 
 #ifdef UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING
 struct socket_transmission_time {
@@ -252,8 +252,7 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
         pr_err("setsockopt SOCKET_TRANSMISSION_TIME failed");
     }
 
-    /* TODO: Set SO_PRIORITY through command line argument from application instead of hardcoding */
-    int priority = 3;
+    int priority = connectionConfig->socket_priority;
     if (setsockopt(newChannel->sockfd, SOL_SOCKET, SO_PRIORITY, &priority, sizeof(int))) {
         perror("setsockopt SO_PRIORITY failed: %m");
     }

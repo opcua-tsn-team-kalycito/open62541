@@ -23,6 +23,9 @@
 #endif
 
 #define UA_MAX_SIZENAME 64  /* Max size of Qualified Name of Subscribed Variable */
+#define MAX_MSG 16
+
+#include "time.h"
 
 /***************/
 /* ReaderGroup */
@@ -282,6 +285,40 @@ UA_DataSetReader *UA_ReaderGroup_findDSRbyId(UA_Server *server, UA_NodeId identi
 void UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_ReaderGroup *readerGroup) {
     UA_PubSubConnection *connection =
         UA_PubSubConnection_findConnectionbyId(server, readerGroup->linkedConnection);
+
+#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV
+    UA_ByteString buffer[MAX_MSG];
+    for (int i = 0; i < MAX_MSG; i++) {
+        if(UA_ByteString_allocBuffer(&buffer[i], 512) != UA_STATUSCODE_GOOD) {
+            UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "Message buffer alloc failed!");
+            return;
+        }
+    }
+
+    UA_UInt32 numOfMsgsRcvd = 0;
+    connection->channel->receiveXDP(connection->channel, buffer, NULL, &numOfMsgsRcvd);
+    if (numOfMsgsRcvd > MAX_MSG) {
+        UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "Will not process every messages");
+        numOfMsgsRcvd = MAX_MSG;
+    }
+
+    for (int i = 0; i < (int)numOfMsgsRcvd; i++) {
+        if(buffer[i].length > 0) {
+            UA_NetworkMessage currentNetworkMessage;
+            memset(&currentNetworkMessage, 0, sizeof(UA_NetworkMessage));
+            size_t currentPosition = 0;
+            UA_NetworkMessage_decodeBinary(&buffer[i], &currentPosition, &currentNetworkMessage);
+            UA_Server_processNetworkMessage(server, &currentNetworkMessage, connection);
+            UA_NetworkMessage_deleteMembers(&currentNetworkMessage);
+        }
+
+    }
+    for (int i = 0; i < MAX_MSG; i++) {
+       UA_ByteString_deleteMembers(&buffer[i]);
+    }
+
+#else
+
     UA_ByteString buffer;
     if(UA_ByteString_allocBuffer(&buffer, 512) != UA_STATUSCODE_GOOD) {
         UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "Message buffer alloc failed!");
@@ -300,6 +337,7 @@ void UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_ReaderGroup *readerG
     }
 
     UA_ByteString_deleteMembers(&buffer);
+#endif
 }
 
 /* Add new subscribeCallback. The first execution is triggered directly after

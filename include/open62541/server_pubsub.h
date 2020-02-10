@@ -121,6 +121,15 @@ typedef struct {
     UA_KeyValuePair *connectionProperties;
     UA_Variant connectionTransportSettings;
 
+#ifdef UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING
+    int socket_priority;
+#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV
+    union {
+    UA_UInt32 opt_xdp_flags;
+    UA_UInt32 opt_queue;
+    } xdpsock_config;
+#endif
+#endif
     /* This flag is 'read only' and is set internally based on the PubSub state. */
     UA_Boolean configurationFrozen;
 } UA_PubSubConnectionConfig;

@@ -230,6 +230,7 @@ endif()
 
 if(UA_ENABLE_PUBSUB)
     if(NOT UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING)
+        if (NOT UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV)
         add_example(tutorial_pubsub_connection pubsub/tutorial_pubsub_connection.c)
         add_example(tutorial_pubsub_publish pubsub/tutorial_pubsub_publish.c)
         if(UA_ENABLE_AMALGAMATION)
@@ -238,7 +239,9 @@ if(UA_ENABLE_PUBSUB)
             add_example(tutorial_pubsub_subscribe pubsub/tutorial_pubsub_subscribe.c)
             add_example(pubsub_subscribe_standalone pubsub/pubsub_subscribe_standalone.c)
         endif()
+        endif()
     else()
+#    if(UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV)
         assign_source_group(${EXAMPLE_SOURCE})
         message(WARNING "PubSub subscriber and publisher tutorial can not be used with UA_ENABLE_PUBSUB_CUSTOM_PUBLISH_HANDLING")
         add_executable(TSN_ETF_publisher pubsub_realtime/TSN_ETF_publisher.c)
@@ -251,9 +254,9 @@ if(UA_ENABLE_PUBSUB)
         set_target_properties(TSN_ETF_publisher PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
         set_target_properties(TSN_ETF_loopback PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
-        target_link_libraries(TSN_ETF_publisher open62541 ${open62541_LIBRARIES} rt pthread mbedtls mbedx509 mbedcrypto) #original line with crypto
-        target_link_libraries(TSN_ETF_loopback open62541 ${open62541_LIBRARIES} rt pthread mbedtls mbedx509 mbedcrypto)
-
+        target_link_libraries(TSN_ETF_publisher open62541 ${open62541_LIBRARIES} rt pthread mbedtls mbedx509 mbedcrypto elf) #original line with crypto
+        target_link_libraries(TSN_ETF_loopback open62541 ${open62541_LIBRARIES} rt pthread mbedtls mbedx509 mbedcrypto elf)
+#    endif()
     endif()
 
 endif()

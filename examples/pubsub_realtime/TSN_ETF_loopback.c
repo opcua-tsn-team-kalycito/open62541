@@ -43,6 +43,10 @@
 #include <open62541/plugin/pubsub_ethernet.h>
 #include "ua_pubsub.h"
 
+#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV
+#include <linux/if_link.h>
+#endif
+
 UA_NodeId readerGroupIdentifier;
 UA_NodeId readerIdentifier;
 
@@ -59,7 +63,7 @@ UA_DataSetReaderConfig readerConfig;
 /* To run only subscriber, enable SUBSCRIBER define alone
  * (comment PUBLISHER) */
 #define             SUBSCRIBER
-//#define             UPDATE_MEASUREMENTS
+#define             UPDATE_MEASUREMENTS
 #define             UA_ENABLE_STATICVALUESOURCE
 /* Publish interval in milliseconds */
 #define             PUB_INTERVAL                    250
@@ -139,7 +143,10 @@ UA_UInt64           pubCounterData         = 0;
 UA_UInt64           subCounterData         = 0;
 UA_Variant          pubCounter;
 UA_Variant          subCounter;
-
+int socket_priority;
+int receive_queue;
+//int xdp_flag;
+UA_UInt32 xdp_flag;
 /* For adding nodes in the server information model */
 static void addServerNodes(UA_Server *server);
 
@@ -230,6 +237,10 @@ addPubSubConnection1(UA_Server *server, UA_NetworkAddressUrlDataType *networkAdd
     memset(&connectionConfig, 0, sizeof(connectionConfig));
     connectionConfig.name                = UA_STRING("Subscriber Connection");
     connectionConfig.enabled             = UA_TRUE;
+#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV
+    connectionConfig.xdpsock_config.opt_queue = (UA_UInt32)receive_queue;
+    connectionConfig.xdpsock_config.opt_xdp_flags = (UA_UInt32)xdp_flag;
+#endif
 #if defined(UA_ENABLE_PUBSUB_ETH_UADP)
     UA_NetworkAddressUrlDataType networkAddressUrlsubscribe = *networkAddressUrlSubscriber;
     connectionConfig.transportProfileUri                    = UA_STRING(ETH_TRANSPORT_PROFILE);
@@ -364,6 +375,7 @@ addPubSubConnection(UA_Server *server, UA_NetworkAddressUrlDataType *networkAddr
     memset(&connectionConfig, 0, sizeof(connectionConfig));
     connectionConfig.name                          = UA_STRING("Publisher Connection");
     connectionConfig.enabled                       = UA_TRUE;
+    connectionConfig.socket_priority = socket_priority;
 #if defined(UA_ENABLE_PUBSUB_ETH_UADP)
     UA_NetworkAddressUrlDataType networkAddressUrl = *networkAddressUrlEthernet;
     connectionConfig.transportProfileUri           = UA_STRING(ETH_TRANSPORT_PROFILE);
@@ -763,7 +775,19 @@ static void addServerNodes(UA_Server *server) {
 #if defined(UA_ENABLE_PUBSUB_ETH_UADP)
 static void
 usage(char *progname) {
-    printf("usage: %s <uri> [device]\n", progname);
+printf("Usage: %s [-puburl urlofpublisher:vlanid.vlanpcp] [-suburl urlofsubscriber] [-i interface] [-p socket_priority] ", progname);
+#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV
+    printf(" [-q rx_queue] [-s]\n");
+#endif
+printf("  Options:\n"
+       "  -puburl, publisher url with vlanid and vlanpcp \n"
+       "  -suburl, subscriber url \n"
+       "  -i, ethernet interface \n"
+       "  -p, socket priority \n"
+       "  -q, rx_queue \n"
+       "  -s, SKB_mode \n");
+//    printf("opc.tcp://<host>:<port>\n");
+//    printf("usage: %s <uri> [device]\n", progname);
 }
 #endif
 /**
@@ -792,50 +816,110 @@ int main(int argc, char **argv) {
 UA_NetworkAddressUrlDataType networkAddressUrlSub;
 #endif
 #if defined(UA_ENABLE_PUBSUB_ETH_UADP)
-    if (argc > 1) {
-        if (strcmp(argv[1], "-h") == 0) {
-            usage(argv[0]);
-            return EXIT_SUCCESS;
-        }
+ if (argc > 1) {
+    if (strcmp(argv[1], "-h") == 0) {
+        usage(argv[0]);
+        return EXIT_SUCCESS;
+    }
 
-        /* check MAC addresses of publisher and subscriber */
-        else if ((strncmp(argv[1], "opc.eth://", 10) == 0) && (strncmp(argv[2], "opc.eth://", 10) == 0)) {
-            if (argc < 4) {
-                printf("Error: UADP/ETH needs an interface name\n");
-                return EXIT_FAILURE;
-            }
-
+    for(int argpos=1; argpos < argc; argpos++)
+    {
+        if ((strcmp(argv[argpos], "-puburl") == 0) && (strcmp(argv[argpos+2], "-suburl") == 0)) {
+            if ((strncmp(argv[argpos+1], "opc.eth://", 10) == 0) && (strncmp(argv[argpos+3], "opc.eth://", 10) == 0)) {
+                if (argc < 7) {
+                    printf("Error: UADP/ETH needs an interface name\n");
+                    return EXIT_FAILURE;
+                }
 #if defined(PUBLISHER)
-            networkAddressUrlEthernet.networkInterface = UA_STRING(argv[3]);
-            networkAddressUrlEthernet.url = UA_STRING(argv[1]);
+                networkAddressUrlEthernet.networkInterface = UA_STRING(argv[argpos+5]);
+                networkAddressUrlEthernet.url = UA_STRING(argv[argpos+1]);
 #endif
 #if defined(SUBSCRIBER)
-            networkAddressUrlSub.networkInterface = UA_STRING(argv[3]);
-            networkAddressUrlSub.url = UA_STRING(argv[2]);
+                networkAddressUrlSub.networkInterface = UA_STRING(argv[argpos+5]);
+                networkAddressUrlSub.url = UA_STRING(argv[argpos+3]);
+#endif
+            }
+            continue;
+        }
+
+        if (argc == 7) {
+        printf("Info: Socketpriority not given, using default socket_priority 3\n");
+        socket_priority = 3;
+#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV
+        printf("Info: rx_queue not specified, using default rx_queue 2 for XDP\n");
+        receive_queue = 2;
+        xdp_flag |= XDP_FLAGS_SKB_MODE ;
+
 #endif
         }
-        /* check MAC address of subscriber alone*/
-        else if (strncmp(argv[1], "opc.eth://", 10) == 0) {
-            if (argc < 3) {
-                printf("Error: UADP/ETH needs an interface name\n");
-                return EXIT_FAILURE;
-            }
 
-#if defined(SUBSCRIBER)
-            networkAddressUrlSub.networkInterface = UA_STRING(argv[2]);
-            networkAddressUrlSub.url = UA_STRING(argv[1]);
+        else if(argc > 7)
+        {
+            if(strcmp(argv[argpos], "-p") == 0) {
+                argpos++;
+                socket_priority = atoi(argv[argpos]);
+                continue;
+            }
+#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV
+            if(strcmp(argv[argpos], "-q") == 0) {
+                argpos++;
+                receive_queue = atoi(argv[argpos]);
+                continue;
+            }
+            if(strcmp(argv[argpos], "-s") == 0) {
+                argpos++;
+                xdp_flag = XDP_FLAGS_SKB_MODE;
+                continue;
+            }
 #endif
         }
     }
+//
+//        /* check MAC addresses of publisher and subscriber */
+//        else if ((strncmp(argv[1], "opc.eth://", 10) == 0) && (strncmp(argv[2], "opc.eth://", 10) == 0)) {
+//            if (argc < 4) {
+//                printf("Error: UADP/ETH needs an interface name\n");
+//                return EXIT_FAILURE;
+//            }
+//
+//#if defined(PUBLISHER)
+//            networkAddressUrlEthernet.networkInterface = UA_STRING(argv[3]);
+//            networkAddressUrlEthernet.url = UA_STRING(argv[1]);
+//            socket_priority = atoi(argv[4]);
+//#endif
+//#if defined(SUBSCRIBER)
+//            networkAddressUrlSub.networkInterface = UA_STRING(argv[3]);
+//            networkAddressUrlSub.url = UA_STRING(argv[2]);
+//            receive_queue = atoi(argv[5]);
+////            xdp_flag = atoi(argv[6]);
+//#endif
+//        }
+//        /* check MAC address of publisher alone*/
+//        else if (strncmp(argv[1], "opc.eth://", 10) == 0) {
+//            if (argc < 3) {
+//                printf("Error: UADP/ETH needs an interface name\n");
+//                return EXIT_FAILURE;
+//            }
+//
+//#if defined(PUBLISHER)
+//            networkAddressUrlEthernet.networkInterface = UA_STRING(argv[2]);
+//            networkAddressUrlEthernet.url = UA_STRING(argv[1]);
+//#endif
+//        }
+}
 
-    else {
+else {
+    usage(argv[0]);
 #if defined(PUBLISHER)
         networkAddressUrlEthernet.networkInterface = UA_STRING("enp2s0");
-        networkAddressUrlEthernet.url = UA_STRING("opc.eth://00-07-32-6b-a6-ab"); /* MAC address of subscribing node*/
+        networkAddressUrlEthernet.url = UA_STRING("opc.eth://01-00-5E-7F-00-01:8.3"); /* MAC address of subscribing node*/
+        socket_priority = 3;
 #endif
 #if defined(SUBSCRIBER)
-        networkAddressUrlSub.url = UA_STRING("opc.eth://00-07-32-6b-a6-d3"); /* Self MAC address */
+        networkAddressUrlSub.url = UA_STRING("opc.eth://01-00-5E-00-00-01"); /* Self MAC address */
         networkAddressUrlSub.networkInterface = UA_STRING("enp2s0");
+        receive_queue = 2;
+        xdp_flag = XDP_FLAGS_SKB_MODE;
 #endif
     }
 
@@ -882,16 +966,41 @@ UA_NetworkAddressUrlDataType networkAddressUrlSub;
 #endif
 
 #if defined(UA_ENABLE_PUBSUB_ETH_UADP)
-#if defined (PUBLISHER) && defined(SUBSCRIBER)
-    config->pubsubTransportLayers[0] = UA_PubSubTransportLayerEthernet();
-    config->pubsubTransportLayersSize++;
-    config->pubsubTransportLayers[1] = UA_PubSubTransportLayerEthernet();
-    config->pubsubTransportLayersSize++;
-#else
-    config->pubsubTransportLayers[0] = UA_PubSubTransportLayerEthernet();
-    config->pubsubTransportLayersSize++;
+    #if defined (PUBLISHER) && defined(SUBSCRIBER)
+        printf ("\n pub & sub layer 0\n");
+        config->pubsubTransportLayers[0] = UA_PubSubTransportLayerEthernet();
+        config->pubsubTransportLayersSize++;
+//        #if defined(UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV)
+//            printf ("\n pub & sub layer 1 xdp\n");
+//            config->pubsubTransportLayers[1] = UA_PubSubTransportLayerEthernet_XDPrecv();
+//            config->pubsubTransportLayersSize++;
+//        #else
+//            printf ("\n sub layer ethernet\n");
+//            config->pubsubTransportLayers[1] = UA_PubSubTransportLayerEthernet();
+//            config->pubsubTransportLayersSize++;
+//        #endif
+    #else
+        config->pubsubTransportLayers[0] = UA_PubSubTransportLayerEthernet();
+        config->pubsubTransportLayersSize++;
+    #endif
 #endif
-#endif
+
+//#if defined(PUBLISHER)
+//#ifdef UA_ENABLE_PUBSUB_ETH_UADP
+////#ifndef UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV
+//    config->pubsubTransportLayers[0] = UA_PubSubTransportLayerEthernet();
+//    config->pubsubTransportLayersSize++;
+////#endif
+//#endif
+//#endif
+//#if defined(SUBSCRIBER)
+//#if defined(UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV) && defined(UA_ENABLE_PUBSUB_ETH_UADP)
+//    printf ("\n pub & sub layer 1 xdp\n");
+//    config->pubsubTransportLayers[1] = UA_PubSubTransportLayerEthernet_XDPrecv();
+//    config->pubsubTransportLayersSize++;
+//#endif
+//#endif
+
 
 #if defined(PUBLISHER) || defined(SUBSCRIBER)
     /* Server is the new OPCUA model which has both publisher and subscriber configuration */
@@ -905,6 +1014,11 @@ UA_NetworkAddressUrlDataType networkAddressUrlSub;
     addDataSetField(server);
     addWriterGroup(server);
     addDataSetWriter(server);
+#endif
+
+#if defined(UA_ENABLE_PUBSUB_ETH_UADP_XDP_RECV)
+    config->pubsubTransportLayers[1] = UA_PubSubTransportLayerEthernet_XDPrecv();
+    config->pubsubTransportLayersSize++;
 #endif
 
 #if defined(SUBSCRIBER)
@@ -1001,3 +1115,4 @@ UA_NetworkAddressUrlDataType networkAddressUrlSub;
 
     return (int)retval;
 }
+
