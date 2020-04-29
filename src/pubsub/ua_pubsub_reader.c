@@ -554,7 +554,6 @@ UA_Server_freezeReaderGroupConfiguration(UA_Server *server, const UA_NodeId read
         }
         *dsWriterIds = dataSetReader->config.dataSetWriterId;
 
-
         UA_NetworkMessage *networkMessage = (UA_NetworkMessage *) UA_calloc(1, sizeof(UA_NetworkMessage));
         if(!networkMessage) {
             UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
@@ -570,6 +569,7 @@ UA_Server_freezeReaderGroupConfiguration(UA_Server *server, const UA_NodeId read
             return UA_STATUSCODE_BADINTERNALERROR;
         }
 
+        memset(&dataSetReader->bufferedMessage, 0, sizeof(UA_NetworkMessageOffsetBuffer));
         dataSetReader->bufferedMessage.RTsubscriberEnabled = UA_TRUE;
         /* Fix the offsets necessary to decode */
         UA_NetworkMessage_calcSizeBinary(networkMessage, &dataSetReader->bufferedMessage);
@@ -598,6 +598,27 @@ UA_Server_unfreezeReaderGroupConfiguration(UA_Server *server, const UA_NodeId re
     LIST_FOREACH(dataSetReader, &rg->readers, listEntry) {
         dataSetReader->configurationFrozen = UA_FALSE;
     }
+
+    if(rg->config.rtLevel == UA_PUBSUB_RT_FIXED_SIZE) {
+        dataSetReader = LIST_FIRST(&rg->readers);
+        if(dataSetReader->bufferedMessage.offsetsSize > 0){
+            for (size_t i = 0; i < dataSetReader->bufferedMessage.offsetsSize; i++) {
+                if(dataSetReader->bufferedMessage.offsets[i].contentType == UA_PUBSUB_OFFSETTYPE_PAYLOAD_VARIANT){
+                    UA_DataValue_delete(dataSetReader->bufferedMessage.offsets[i].offsetData.value.value);
+                }
+            }
+
+            UA_free(dataSetReader->bufferedMessage.offsets);
+        }
+
+        if(dataSetReader->bufferedMessage.RTsubscriberEnabled) {
+            if(dataSetReader->bufferedMessage.nm != NULL) {
+                UA_NetworkMessage_delete(dataSetReader->bufferedMessage.nm);
+                UA_free(dataSetReader->bufferedMessage.nm);
+            }
+        }
+    }
+
     return UA_STATUSCODE_GOOD;
 }
 
@@ -756,9 +777,23 @@ void UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_ReaderGroup *readerG
              */
             UA_DataSetReader *dataSetReader = LIST_FIRST(&readerGroup->readers);
             /* Decode only the necessary offset and update the networkMessage */
-            if(UA_NetworkMessage_updateBufferedNwMessage(&dataSetReader->bufferedMessage, &buffer) != UA_STATUSCODE_GOOD)
-                UA_LOG_DEBUG(&server->config.logger, UA_LOGCATEGORY_SERVER,
+            if(UA_NetworkMessage_updateBufferedNwMessage(&dataSetReader->bufferedMessage, &buffer) != UA_STATUSCODE_GOOD) {
+                UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER,
                              "PubSub receive. Unknown field type.");
+                UA_ByteString_deleteMembers(&buffer);
+                return;
+            }
+
+            /* Check the decoded message is the expected one
+             * TODO: PublisherID check after modification in NM to support all datatypes
+             *  */
+            if((dataSetReader->bufferedMessage.nm->groupHeader.writerGroupId != dataSetReader->config.writerGroupId) ||
+               (*dataSetReader->bufferedMessage.nm->payloadHeader.dataSetPayloadHeader.dataSetWriterIds != dataSetReader->config.dataSetWriterId)) {
+                UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER,
+                             "PubSub receive. Unknown message received. Will not be processed.");
+                UA_ByteString_deleteMembers(&buffer);
+                return;
+            }
 
             UA_Server_DataSetReader_process(server, dataSetReader,
                                             dataSetReader->bufferedMessage.nm->payload.dataSetPayload.dataSetMessages);
@@ -1269,20 +1304,6 @@ UA_DataSetReader_clear(UA_Server *server, UA_DataSetReader *dataSetReader) {
 
     UA_NodeId_deleteMembers(&dataSetReader->identifier);
     UA_NodeId_deleteMembers(&dataSetReader->linkedReaderGroup);
-    if(dataSetReader->bufferedMessage.offsetsSize > 0){
-        for (size_t i = 0; i < dataSetReader->bufferedMessage.offsetsSize; i++) {
-            if(dataSetReader->bufferedMessage.offsets[i].contentType == UA_PUBSUB_OFFSETTYPE_PAYLOAD_VARIANT){
-                UA_DataValue_delete(dataSetReader->bufferedMessage.offsets[i].offsetData.value.value);
-            }
-        }
-        UA_ByteString_deleteMembers(&dataSetReader->bufferedMessage.buffer);
-        UA_free(dataSetReader->bufferedMessage.offsets);
-    }
-
-    if(dataSetReader->bufferedMessage.RTsubscriberEnabled) {
-        UA_NetworkMessage_delete(dataSetReader->bufferedMessage.nm);
-        UA_free(dataSetReader->bufferedMessage.nm);
-    }
 
     /* Remove DataSetReader from group */
     LIST_REMOVE(dataSetReader, listEntry);
