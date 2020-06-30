@@ -192,6 +192,10 @@ endif()
 
 add_subdirectory(nodeset)
 
+# Add the machine subdirectory to build the tutorials used
+# for the OPC UA course
+add_subdirectory(machine)
+
 ####################
 #  Example PubSub  #
 ####################
