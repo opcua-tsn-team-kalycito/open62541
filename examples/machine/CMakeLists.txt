@@ -30,6 +30,11 @@ if(UA_NAMESPACE_ZERO STREQUAL "FULL" OR UA_NAMESPACE_ZERO STREQUAL "REDUCED")
     add_example(tutorial_server_read_write tutorial_server_read_write.c)
     add_example(tutorial_client_read_write tutorial_client_read_write.c)
 
+    add_example(tutorial_server_information_model tutorial_server_information_model.c
+                ${UA_NODESET_MACHINEIM_SOURCES})
+    target_link_libraries(tutorial_server_information_model ${LIBS})
+    add_dependencies(tutorial_server_information_model open62541-generator-ns-machineim)
+
     add_example(tutorial_server_methodcall tutorial_server_methodcall.c
                 ${UA_NODESET_MACHINEIM_SOURCES})
     target_link_libraries(tutorial_server_methodcall ${LIBS})
