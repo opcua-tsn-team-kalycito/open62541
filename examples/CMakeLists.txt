@@ -192,6 +192,8 @@ endif()
 
 add_subdirectory(nodeset)
 
+add_subdirectory(machine)
+
 ####################
 #  Example PubSub  #
 ####################
