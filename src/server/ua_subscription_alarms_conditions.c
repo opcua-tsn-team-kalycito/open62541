@@ -84,6 +84,7 @@
 #define CONDITION_FIELD_OKRESPONSE                             "OkResponse"
 #define CONDITION_FIELD_CANCELRESPONSE                         "CancelResponse"
 #define CONDITION_FIELD_RESPOND                                "Respond"
+#define CONDITION_FIELD_ENGINEERINGUNITS                       "EngineeringUnits"
 
 #define REFRESHEVENT_START_IDX                                 0
 #define REFRESHEVENT_END_IDX                                   1
@@ -96,6 +97,8 @@
 #endif
 
 #define LOCALE                                                 "en"
+#define LOCALE_NULL                                             ""
+#define TEXT_NULL                                               ""
 #define ENABLED_TEXT                                           "Enabled"
 #define DISABLED_TEXT                                          "Disabled"
 #define ENABLED_MESSAGE                                        "The alarm was enabled"
@@ -126,6 +129,12 @@ static const UA_QualifiedName fieldConfirmedStateQN = STATIC_QN(CONDITION_FIELD_
 static const UA_QualifiedName fieldActiveStateQN = STATIC_QN(CONDITION_FIELD_ACTIVESTATE);
 static const UA_QualifiedName fieldTimeQN = STATIC_QN(CONDITION_FIELD_TIME);
 static const UA_QualifiedName fieldSourceQN = STATIC_QN(CONDITION_FIELD_SOURCENODE);
+static const UA_QualifiedName fieldLimitStateQN = STATIC_QN(CONDITION_FIELD_LIMITSTATE);
+static const UA_QualifiedName fieldLowLimitQN = STATIC_QN(CONDITION_FIELD_LOWLIMIT);
+static const UA_QualifiedName fieldLowLowLimitQN = STATIC_QN(CONDITION_FIELD_LOWLOWLIMIT);
+static const UA_QualifiedName fieldHighLimitQN = STATIC_QN(CONDITION_FIELD_HIGHLIMIT);
+static const UA_QualifiedName fieldHighHighLimitQN = STATIC_QN(CONDITION_FIELD_HIGHHIGHLIMIT);
+static const UA_QualifiedName fieldEngineeringUnitsQN = STATIC_QN(CONDITION_FIELD_ENGINEERINGUNITS);
 
 #ifdef UA_ENABLE_ENCRYPTION
 static const UA_QualifiedName fieldExpirationLimitQN = STATIC_QN(CONDITION_FIELD_EXPIRATION_LIMIT);
@@ -2052,6 +2061,46 @@ setStandardConditionFields(UA_Server *server, const UA_NodeId* condition,
         CONDITION_ASSERT_RETURN_RETVAL(retval, "Set ActiveState Field failed",);
     }
 
+#ifdef CONDITIONOPTIONALFIELDS_SUPPORT
+    /* 3. Check if the ConditionType is subType of LimitAlarmType */
+    UA_NodeId LimitAlarmTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_LIMITALARMTYPE);
+    if(!isNodeInTree_singleRef(server, conditionType, &LimitAlarmTypeId,
+                               UA_REFERENCETYPEINDEX_HASSUBTYPE))
+        return retval;
+
+    /* Set optional field property. For the LimitAlarm and its subtypes, atleast one limit is mandatory*/
+    /* Add optional field LowLimit */
+    retval = UA_Server_addConditionOptionalField(server, *condition, LimitAlarmTypeId,
+                                                 fieldLowLimitQN, NULL);
+    CONDITION_ASSERT_RETURN_RETVAL(retval, "Adding LowLimit optional Field failed",);
+
+    /* Add optional field HighLimit */
+    retval = UA_Server_addConditionOptionalField(server, *condition, LimitAlarmTypeId,
+                                                 fieldHighLimitQN, NULL);
+    CONDITION_ASSERT_RETURN_RETVAL(retval, "Adding HighLimit optional Field failed",);
+
+    /* Add optional field HighHighLimit */
+    retval = UA_Server_addConditionOptionalField(server, *condition, LimitAlarmTypeId,
+                                                 fieldHighHighLimitQN, NULL);
+    CONDITION_ASSERT_RETURN_RETVAL(retval, "Adding HighLimit optional Field failed",);
+
+    /* Add optional field LowLowLimit */
+    retval = UA_Server_addConditionOptionalField(server, *condition, LimitAlarmTypeId,
+                                                 fieldLowLowLimitQN, NULL);
+    CONDITION_ASSERT_RETURN_RETVAL(retval, "Adding LowLowLimit optional Field failed",);
+
+    /* 4. Check if the ConditionType is subType of RateOfChangeAlarmType */
+    UA_NodeId RateOfChangeAlarmTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_EXCLUSIVERATEOFCHANGEALARMTYPE);
+    if(!isNodeInTree_singleRef(server, conditionType, &RateOfChangeAlarmTypeId,
+                               UA_REFERENCETYPEINDEX_HASSUBTYPE))
+        return retval;
+
+    retval = UA_Server_addConditionOptionalField(server, *condition, RateOfChangeAlarmTypeId,
+                                                fieldEngineeringUnitsQN, NULL);
+    CONDITION_ASSERT_RETURN_RETVAL(retval, "Adding EngineeringUnit optional Field failed",);
+
+#endif//CONDITIONOPTIONALFIELDS_SUPPORT
+
     return retval;
 }
 
@@ -2610,6 +2659,144 @@ UA_StatusCode UA_Server_deleteCondition(UA_Server *server, const UA_NodeId condi
     }
     // Delete from address space
     return UA_Server_deleteNode(server, condition, true);
+}
+
+static UA_StatusCode getLowLimit(UA_Server *server, UA_NodeId conditionId, UA_Double *lowLimit) {
+    UA_Variant *value = UA_Variant_new();
+    UA_StatusCode retval = UA_Server_readObjectProperty(server, conditionId,
+                                UA_QUALIFIEDNAME(0, CONDITION_FIELD_LOWLIMIT),
+                                value);
+    *lowLimit = *(UA_Double*) value->data;
+    UA_Variant_delete(value);
+    return retval;
+}
+
+static UA_StatusCode getLowLowLimit(UA_Server *server, UA_NodeId conditionId, UA_Double *lowLowLimit) {
+    UA_Variant *value = UA_Variant_new();
+    UA_StatusCode retval = UA_Server_readObjectProperty(server, conditionId,
+                                UA_QUALIFIEDNAME(0, CONDITION_FIELD_LOWLOWLIMIT),
+                                value);
+    *lowLowLimit = *(UA_Double*) value->data;
+    UA_Variant_delete(value);
+    return retval;
+}
+
+static UA_StatusCode getHighLimit(UA_Server *server, UA_NodeId conditionId, UA_Double *highLimit) {
+    UA_Variant *value = UA_Variant_new();
+    UA_StatusCode retval = UA_Server_readObjectProperty(server, conditionId,
+                                UA_QUALIFIEDNAME(0, CONDITION_FIELD_HIGHLIMIT),
+                                value);
+    *highLimit = *(UA_Double*) value->data;
+    UA_Variant_delete(value);
+    return retval;
+}
+
+static UA_StatusCode getHighHighLimit(UA_Server *server, UA_NodeId conditionId, UA_Double *highHighLimit) {
+    UA_Variant *value = UA_Variant_new();
+    UA_StatusCode retval = UA_Server_readObjectProperty(server, conditionId,
+                                UA_QUALIFIEDNAME(0, CONDITION_FIELD_HIGHHIGHLIMIT),
+                                value);
+    *highHighLimit = *(UA_Double*) value->data;
+    UA_Variant_delete(value);
+    return retval;
+}
+
+UA_StatusCode
+UA_Server_setLimitState(UA_Server *server, const UA_NodeId conditionId,
+                        UA_Double limitValue) {
+    UA_NodeId limitState;
+    UA_Double lowLowLimit;
+    UA_Double lowLimit;
+    UA_Double highLimit;
+    UA_Double highHighLimit;
+    UA_Variant value;
+    UA_QualifiedName currentStateField = UA_QUALIFIEDNAME(0,"CurrentState");
+    UA_QualifiedName currentStateIdField = UA_QUALIFIEDNAME(0,"Id");
+    UA_StatusCode retval = getConditionFieldNodeId(server, &conditionId, &fieldLimitStateQN, &limitState);
+
+    retval |= getHighHighLimit(server, conditionId, &highHighLimit);
+    if(retval == UA_STATUSCODE_GOOD) {
+        if(limitValue >= highHighLimit) {
+            UA_NodeId highHighLimitId;
+            retval |= getConditionFieldNodeId(server, &conditionId, &fieldHighHighLimitQN, &highHighLimitId);
+
+            UA_LocalizedText text = UA_LOCALIZEDTEXT(LOCALE, ACTIVE_HIGHHIGH_TEXT);
+            UA_Variant_setScalar(&value, &text, &UA_TYPES[UA_TYPES_LOCALIZEDTEXT]);
+            retval |= UA_Server_setConditionField(server, limitState, &value, currentStateField);
+
+            UA_Variant_setScalar(&value, &highHighLimitId, &UA_TYPES[UA_TYPES_NODEID]);
+            retval |= UA_Server_setConditionVariableFieldProperty(server, limitState, &value,
+                                                                currentStateField,
+                                                                currentStateIdField);
+            return retval;
+        }
+    }
+
+    retval |= getHighLimit(server, conditionId, &highLimit);
+    if(retval == UA_STATUSCODE_GOOD) {
+        if(limitValue >= highLimit) {
+            UA_NodeId highLimitId;
+            retval |= getConditionFieldNodeId(server, &conditionId, &fieldHighLimitQN, &highLimitId);
+
+            UA_LocalizedText text = UA_LOCALIZEDTEXT(LOCALE, ACTIVE_HIGH_TEXT);
+            UA_Variant_setScalar(&value, &text, &UA_TYPES[UA_TYPES_LOCALIZEDTEXT]);
+            retval |= UA_Server_setConditionField(server, limitState, &value, currentStateField);
+
+            UA_Variant_setScalar(&value, &highLimitId, &UA_TYPES[UA_TYPES_NODEID]);
+            retval |= UA_Server_setConditionVariableFieldProperty(server, limitState, &value,
+                                                        currentStateField,
+                                                        currentStateIdField);
+            return retval;
+        }
+    }
+
+    retval |= getLowLowLimit(server, conditionId, &lowLowLimit);
+    if(retval == UA_STATUSCODE_GOOD) {
+        if(limitValue <= lowLowLimit) {
+
+            UA_NodeId lowLowLimitId;
+            retval |= getConditionFieldNodeId(server, &conditionId, &fieldLowLowLimitQN, &lowLowLimitId);
+
+            UA_LocalizedText text = UA_LOCALIZEDTEXT(LOCALE, ACTIVE_LOWLOW_TEXT);
+            UA_Variant_setScalar(&value, &text, &UA_TYPES[UA_TYPES_LOCALIZEDTEXT]);
+            retval |= UA_Server_setConditionField(server, limitState, &value, currentStateField);
+
+            UA_Variant_setScalar(&value, &lowLowLimitId, &UA_TYPES[UA_TYPES_NODEID]);
+            retval |= UA_Server_setConditionVariableFieldProperty(server, limitState, &value,
+                                                        currentStateField,
+                                                        currentStateIdField);
+            return retval;
+        }
+    }
+
+    retval |= getLowLimit(server, conditionId, &lowLimit);
+    if(retval == UA_STATUSCODE_GOOD) {
+        if(limitValue <= lowLimit) {
+            UA_NodeId lowLimitId;
+            retval |= getConditionFieldNodeId(server, &conditionId, &fieldLowLimitQN, &lowLimitId);
+
+            UA_LocalizedText text = UA_LOCALIZEDTEXT(LOCALE, ACTIVE_LOW_TEXT);
+            UA_Variant_setScalar(&value, &text, &UA_TYPES[UA_TYPES_LOCALIZEDTEXT]);
+            retval |= UA_Server_setConditionField(server, limitState, &value, currentStateField);
+
+            UA_Variant_setScalar(&value, &lowLimitId, &UA_TYPES[UA_TYPES_NODEID]);
+            retval |= UA_Server_setConditionVariableFieldProperty(server, limitState, &value,
+                                                        currentStateField,
+                                                        currentStateIdField);
+            return retval;
+        }
+    }
+
+    UA_LocalizedText textNull = UA_LOCALIZEDTEXT(LOCALE_NULL, TEXT_NULL);
+    UA_Variant_setScalar(&value, &textNull, &UA_TYPES[UA_TYPES_LOCALIZEDTEXT]);
+    retval |= UA_Server_setConditionField(server, limitState, &value, currentStateField);
+
+    UA_NodeId nodeIdNull = UA_NODEID_NULL;
+    UA_Variant_setScalar(&value, &nodeIdNull, &UA_TYPES[UA_TYPES_NODEID]);
+    retval |= UA_Server_setConditionVariableFieldProperty(server, limitState, &value,
+                                                currentStateField,
+                                                currentStateIdField);
+    return retval;
 }
 
 #ifdef UA_ENABLE_ENCRYPTION
