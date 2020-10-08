@@ -174,8 +174,7 @@ START_TEST(SubscribeSingleFieldWithFixedOffsets) {
 
     /* Reader Group */
     UA_ReaderGroupConfig readerGroupConfig;
-    retVal = UA_Server_ReaderGroup_setDefaultConfig(&readerGroupConfig);
-    ck_assert(retVal == UA_STATUSCODE_GOOD);
+    memset(&readerGroupConfig, 0, sizeof(readerGroupConfig));
     readerGroupConfig.rtLevel = UA_PUBSUB_RT_FIXED_SIZE;
     retVal =  UA_Server_addReaderGroup(server, connectionIdentifier, &readerGroupConfig,
                                        &readerGroupIdentifier);
@@ -353,8 +352,7 @@ START_TEST(SetupInvalidPubSubConfig) {
     ck_assert(UA_Server_addDataSetField(server, publishedDataSetIdent, &dsfConfig, &dataSetFieldIdent).result == UA_STATUSCODE_GOOD);
     /* Reader Group */
     UA_ReaderGroupConfig readerGroupConfig;
-    retVal = UA_Server_ReaderGroup_setDefaultConfig(&readerGroupConfig);
-    ck_assert(retVal == UA_STATUSCODE_GOOD);
+    memset(&readerGroupConfig, 0, sizeof(readerGroupConfig));
     readerGroupConfig.rtLevel = UA_PUBSUB_RT_FIXED_SIZE;
     retVal =  UA_Server_addReaderGroup(server, connectionIdentifier, &readerGroupConfig,
                                        &readerGroupIdentifier);

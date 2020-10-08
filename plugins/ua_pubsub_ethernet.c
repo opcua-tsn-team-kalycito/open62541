@@ -286,7 +286,6 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
 
 #if defined(__linux__)
     if(sockOptions.enableSocketTxTime == UA_TRUE) {
-        channelDataEthernet->useSoTxTime = UA_TRUE;
         /* Setting socket txtime with required flags to the socket */
         sock_txtime sk_txtime;
         memset(&sk_txtime, 0, sizeof(sk_txtime));
@@ -302,6 +301,8 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
             UA_free(newChannel);
             return NULL;
         }
+
+        channelDataEthernet->useSoTxTime = UA_TRUE;
     }
 #endif
 
@@ -439,9 +440,9 @@ sendWithTxTime(UA_PubSubChannel *channel, UA_ExtensionObject *transportSettings,
     controlMsg             = CMSG_FIRSTHDR(&message);
     controlMsg->cmsg_level = SOL_SOCKET;
     controlMsg->cmsg_type  = SCM_TXTIME;
-    controlMsg->cmsg_len   = CMSG_LEN(sizeof(__u64));
+    controlMsg->cmsg_len   = CMSG_LEN(sizeof(UA_UInt64));
     if(ethernettransportSettings && (ethernettransportSettings->transmission_time != 0))
-        *((__u64 *) CMSG_DATA(controlMsg)) = ethernettransportSettings->transmission_time;
+        *((UA_UInt64 *) CMSG_DATA(controlMsg)) = ethernettransportSettings->transmission_time;
 
     msgCount = sendmsg(channel->sockfd, &message, 0);
     if ((msgCount < 1) && (msgCount != (UA_Int32)lenBuf)) {

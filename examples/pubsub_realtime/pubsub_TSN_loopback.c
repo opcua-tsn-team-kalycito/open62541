@@ -113,6 +113,9 @@ UA_DataSetReaderConfig readerConfig;
 #define             CORE_THREE                            3
 #define             SECONDS_INCREMENT                     1
 #define             CLOCKID                               CLOCK_TAI
+#ifndef CLOCK_TAI
+#define             CLOCK_TAI                             11
+#endif
 #define             ETH_TRANSPORT_PROFILE                 "http://opcfoundation.org/UA-Profile/Transport/pubsub-eth-uadp"
 
 /* If the Hardcoded publisher/subscriber MAC addresses need to be changed,
@@ -344,22 +347,20 @@ addReaderGroup(UA_Server *server) {
         return;
 
     UA_ReaderGroupConfig readerGroupConfig;
-    UA_StatusCode retval = UA_Server_ReaderGroup_setDefaultConfig(&readerGroupConfig);
-    if(retval != UA_STATUSCODE_GOOD)
-        return;
-
-    /* Set custom config name */
-    readerGroupConfig.name = UA_STRING("ReaderGroup 1");
+    memset (&readerGroupConfig, 0, sizeof(UA_ReaderGroupConfig));
+    readerGroupConfig.name = UA_STRING("ReaderGroup");
 #if defined PUBSUB_CONFIG_RT_INFORMATION_MODEL
     readerGroupConfig.rtLevel = UA_PUBSUB_RT_FIXED_SIZE;
 #endif
-    readerGroupConfig.timeout = 50;  // As we run in 250us cycle time, modify default timeout (1ms) to 50us
+    readerGroupConfig.timeout = UA_UInt32_new();
+    *readerGroupConfig.timeout = 50;  // As we run in 250us cycle time, modify default timeout (1ms) to 50us
     readerGroupConfig.pubsubManagerCallback.addCustomCallback = addPubSubApplicationCallback;
     readerGroupConfig.pubsubManagerCallback.changeCustomCallbackInterval = changePubSubApplicationCallbackInterval;
     readerGroupConfig.pubsubManagerCallback.removeCustomCallback = removePubSubApplicationCallback;
 
     UA_Server_addReaderGroup(server, connectionIdentSubscriber, &readerGroupConfig,
                              &readerGroupIdentifier);
+    UA_free(readerGroupConfig.timeout);
 }
 
 /* Set SubscribedDataSet type to TargetVariables data type

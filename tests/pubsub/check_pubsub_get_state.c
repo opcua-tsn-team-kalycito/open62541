@@ -167,7 +167,7 @@ static void AddReaderGroup(
     assert(opReaderGroupId != 0);
 
     UA_ReaderGroupConfig readerGroupConfig;
-    memset (&readerGroupConfig, 0, sizeof(UA_ReaderGroupConfig));
+    memset(&readerGroupConfig, 0, sizeof(readerGroupConfig));
     readerGroupConfig.name = UA_STRING(pName);
     ck_assert(UA_Server_addReaderGroup(server, *pConnectionId, &readerGroupConfig,
                                        opReaderGroupId) == UA_STATUSCODE_GOOD);
