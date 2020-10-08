@@ -113,6 +113,9 @@ UA_DataSetReaderConfig readerConfig;
 #define             CORE_THREE                            3
 #define             SECONDS_INCREMENT                     1
 #define             CLOCKID                               CLOCK_TAI
+#ifndef CLOCK_TAI
+#define             CLOCK_TAI                             11
+#endif
 #define             ETH_TRANSPORT_PROFILE                 "http://opcfoundation.org/UA-Profile/Transport/pubsub-eth-uadp"
 
 /* If the Hardcoded publisher/subscriber MAC addresses need to be changed,
@@ -344,22 +347,21 @@ addReaderGroup(UA_Server *server) {
         return;
 
     UA_ReaderGroupConfig readerGroupConfig;
-    UA_StatusCode retval = UA_Server_ReaderGroup_setDefaultConfig(&readerGroupConfig);
-    if(retval != UA_STATUSCODE_GOOD)
-        return;
-
-    /* Set custom config name */
-    readerGroupConfig.name = UA_STRING("ReaderGroup 1");
+    memset (&readerGroupConfig, 0, sizeof(UA_ReaderGroupConfig));
+    readerGroupConfig.name   = UA_STRING("ReaderGroup1");
 #if defined PUBSUB_CONFIG_RT_INFORMATION_MODEL
     readerGroupConfig.rtLevel = UA_PUBSUB_RT_FIXED_SIZE;
 #endif
-    readerGroupConfig.timeout = 50;  // As we run in 250us cycle time, modify default timeout (1ms) to 50us
+    readerGroupConfig.subscribingInterval = CYCLE_TIME;
+    readerGroupConfig.timeout = UA_UInt32_new();
+    *readerGroupConfig.timeout = 50;  // As we run in 250us cycle time, modify default timeout (1ms) to 50us
     readerGroupConfig.pubsubManagerCallback.addCustomCallback = addPubSubApplicationCallback;
     readerGroupConfig.pubsubManagerCallback.changeCustomCallbackInterval = changePubSubApplicationCallbackInterval;
     readerGroupConfig.pubsubManagerCallback.removeCustomCallback = removePubSubApplicationCallback;
 
     UA_Server_addReaderGroup(server, connectionIdentSubscriber, &readerGroupConfig,
                              &readerGroupIdentifier);
+    UA_free(readerGroupConfig.timeout);
 }
 
 /* Set SubscribedDataSet type to TargetVariables data type
@@ -770,11 +772,13 @@ void *subscriber(void *arg) {
     void*             currentReaderGroup;
     UA_ServerCallback subCallback;
     struct timespec   nextnanosleeptimeSub;
+    UA_UInt64         subInterval_ns;
 
     threadArg *threadArgumentsSubscriber = (threadArg *)arg;
     server             = threadArgumentsSubscriber->server;
     subCallback        = threadArgumentsSubscriber->callback;
     currentReaderGroup = threadArgumentsSubscriber->data;
+    subInterval_ns     = (UA_UInt64)(threadArgumentsSubscriber->interval_ms * MILLI_SECONDS);
 
     /* Get current time and compute the next nanosleeptime */
     clock_gettime(CLOCKID, &nextnanosleeptimeSub);
@@ -786,7 +790,7 @@ void *subscriber(void *arg) {
         clock_nanosleep(CLOCKID, TIMER_ABSTIME, &nextnanosleeptimeSub, NULL);
         /* Read subscribed data from the SubscriberCounter variable */
         subCallback(server, currentReaderGroup);
-        nextnanosleeptimeSub.tv_nsec += (__syscall_slong_t)(CYCLE_TIME * MILLI_SECONDS);
+        nextnanosleeptimeSub.tv_nsec += (__syscall_slong_t)subInterval_ns;
         nanoSecondFieldConversion(&nextnanosleeptimeSub);
     }
 
