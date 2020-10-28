@@ -180,7 +180,7 @@ UA_Timer_process(UA_Timer *t, UA_DateTime nowMonotonic,
             if(first->callback) {
                 UA_UNLOCK(t->timerMutex);
                 executionCallback(executionApplication, first->callback,
-                                  first->application, first->data);
+                                  first->application, first->nextTime, first->data);
                 UA_LOCK(t->timerMutex);
             }
             UA_free(first);
@@ -189,6 +189,7 @@ UA_Timer_process(UA_Timer *t, UA_DateTime nowMonotonic,
 
         /* Set the time for the next execution. Prevent an infinite loop by
          * forcing the next processing into the next iteration. */
+        UA_DateTime callbackTime = first->nextTime;
         first->nextTime += (UA_Int64)first->interval;
         if(first->nextTime < nowMonotonic)
             first->nextTime = nowMonotonic + 1;
@@ -204,7 +205,7 @@ UA_Timer_process(UA_Timer *t, UA_DateTime nowMonotonic,
         void *app = first->application;
         void *data = first->data;
         UA_UNLOCK(t->timerMutex);
-        executionCallback(executionApplication, cb, app, data);
+        executionCallback(executionApplication, cb, app, callbackTime, data);
         UA_LOCK(t->timerMutex);
     }
 

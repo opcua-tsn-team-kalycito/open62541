@@ -250,7 +250,7 @@ void UA_Server_delete(UA_Server *server) {
 
 /* Recurring cleanup. Removing unused and timed-out channels and sessions */
 static void
-UA_Server_cleanup(UA_Server *server, void *_) {
+UA_Server_cleanup(UA_Server *server, UA_DateTime callbackTime, void *_) {
     UA_LOCK(server->serviceMutex);
     UA_DateTime nowMonotonic = UA_DateTime_nowMonotonic();
     UA_Server_cleanupSessions(server, nowMonotonic);
@@ -663,10 +663,10 @@ UA_Server_run_startup(UA_Server *server) {
 
 static void
 serverExecuteRepeatedCallback(UA_Server *server, UA_ApplicationCallback cb,
-                              void *callbackApplication, void *data) {
+                              void *callbackApplication, UA_DateTime callbackTime, void *data) {
     /* Service mutex is not set inside the timer that triggers the callback */
     UA_LOCK_ASSERT(server->serviceMutex, 0);
-    cb(callbackApplication, data);
+    cb(callbackApplication, callbackTime, data);
 }
 
 UA_UInt16

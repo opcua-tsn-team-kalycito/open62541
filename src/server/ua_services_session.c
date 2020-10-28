@@ -19,7 +19,7 @@
 
 /* Delayed callback to free the session memory */
 static void
-removeSessionCallback(UA_Server *server, session_list_entry *entry) {
+removeSessionCallback(UA_Server *server, UA_DateTime callbackTime, session_list_entry *entry) {
     UA_LOCK(server->serviceMutex);
     UA_Session_clear(&entry->session, server);
     UA_UNLOCK(server->serviceMutex);

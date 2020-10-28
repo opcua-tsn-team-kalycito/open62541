@@ -650,8 +650,8 @@ UA_Client_backgroundConnectivity(UA_Client *client) {
 
 static void
 clientExecuteRepeatedCallback(void *executionApplication, UA_ApplicationCallback cb,
-                              void *callbackApplication, void *data) {
-    cb(callbackApplication, data);
+                              void *callbackApplication, UA_DateTime callbackTime, void *data) {
+    cb(callbackApplication, callbackTime, data);
 }
 
 UA_StatusCode

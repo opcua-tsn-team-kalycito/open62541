@@ -274,7 +274,7 @@ UA_ReaderGroup_setPubSubState(UA_Server *server, UA_PubSubState state, UA_Reader
 UA_StatusCode
 UA_WriterGroup_addPublishCallback(UA_Server *server, UA_WriterGroup *writerGroup);
 void
-UA_WriterGroup_publishCallback(UA_Server *server, UA_WriterGroup *writerGroup);
+UA_WriterGroup_publishCallback(UA_Server *server, UA_DateTime callbackTime, UA_WriterGroup *writerGroup);
 
 /*********************************************************/
 /*               SubscribeValues handling                */
@@ -283,7 +283,7 @@ UA_WriterGroup_publishCallback(UA_Server *server, UA_WriterGroup *writerGroup);
 UA_StatusCode
 UA_ReaderGroup_addSubscribeCallback(UA_Server *server, UA_ReaderGroup *readerGroup);
 void
-UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_ReaderGroup *readerGroup);
+UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_DateTime callbackTime, UA_ReaderGroup *readerGroup);
 
 #endif /* UA_ENABLE_PUBSUB */
 

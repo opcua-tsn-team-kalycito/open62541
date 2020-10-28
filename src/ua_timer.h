@@ -89,7 +89,7 @@ UA_Timer_removeCallback(UA_Timer *t, UA_UInt64 callbackId);
  * Dispatched is set to true when at least one callback was run / dispatched. */
 typedef void
 (*UA_TimerExecutionCallback)(void *executionApplication, UA_ApplicationCallback cb,
-                             void *callbackApplication, void *data);
+                             void *callbackApplication, UA_DateTime callbackTime, void *data);
 
 UA_DateTime
 UA_Timer_process(UA_Timer *t, UA_DateTime nowMonotonic,

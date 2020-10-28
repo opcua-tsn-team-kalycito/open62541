@@ -355,7 +355,7 @@ UA_Server_run_shutdown(UA_Server *server);
 /**
  * Timed Callbacks
  * --------------- */
-typedef void (*UA_ServerCallback)(UA_Server *server, void *data);
+typedef void (*UA_ServerCallback)(UA_Server *server, UA_DateTime callbackTime, void *data);
 
 /* Add a callback for execution at a specified time. If the indicated time lies
  * in the past, then the callback is executed at the next iteration of the

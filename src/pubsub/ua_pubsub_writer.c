@@ -2046,9 +2046,10 @@ cleanup:
 /* This callback triggers the collection and publish of NetworkMessages and the
  * contained DataSetMessages. */
 void
-UA_WriterGroup_publishCallback(UA_Server *server, UA_WriterGroup *writerGroup) {
+UA_WriterGroup_publishCallback(UA_Server *server, UA_DateTime callbackTime, UA_WriterGroup *writerGroup) {
     UA_LOG_DEBUG(&server->config.logger, UA_LOGCATEGORY_SERVER, "Publish Callback");
 
+printf("Pub Time %ld\n", callbackTime);
     if(!writerGroup) {
         UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
                        "Publish failed. WriterGroup not found");
@@ -2225,7 +2226,7 @@ UA_WriterGroup_addPublishCallback(UA_Server *server, UA_WriterGroup *writerGroup
         writerGroup->publishCallbackIsRegistered = true;
 
     /* Run once after creation */
-    UA_WriterGroup_publishCallback(server, writerGroup);
+    UA_WriterGroup_publishCallback(server, UA_DateTime_nowMonotonic(), writerGroup);
     return retval;
 }
 

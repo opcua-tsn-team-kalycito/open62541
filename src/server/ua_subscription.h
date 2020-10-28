@@ -217,7 +217,7 @@ struct UA_MonitoredItem {
 
 void UA_MonitoredItem_init(UA_MonitoredItem *mon, UA_Subscription *sub);
 void UA_MonitoredItem_delete(UA_Server *server, UA_MonitoredItem *monitoredItem);
-void UA_MonitoredItem_sampleCallback(UA_Server *server, UA_MonitoredItem *monitoredItem);
+void UA_MonitoredItem_sampleCallback(UA_Server *server, UA_DateTime callbackTime, UA_MonitoredItem *monitoredItem);
 UA_StatusCode UA_MonitoredItem_registerSampleCallback(UA_Server *server, UA_MonitoredItem *mon);
 void UA_MonitoredItem_unregisterSampleCallback(UA_Server *server, UA_MonitoredItem *mon);
 

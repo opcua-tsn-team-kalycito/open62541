@@ -842,7 +842,8 @@ UA_DataSetReader *UA_ReaderGroup_findDSRbyId(UA_Server *server, UA_NodeId identi
 
 /* This callback triggers the collection and reception of NetworkMessages and the
  * contained DataSetMessages. */
-void UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_ReaderGroup *readerGroup) {
+void UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_DateTime callbackTime, UA_ReaderGroup *readerGroup) {
+printf("Sub time %ld\n", callbackTime);
 
     UA_LOG_DEBUG(&server->config.logger, UA_LOGCATEGORY_SERVER, "PubSub subscribe callback");
 
@@ -959,7 +960,7 @@ UA_ReaderGroup_addSubscribeCallback(UA_Server *server, UA_ReaderGroup *readerGro
 
     /* Run once after creation */
     if(readerGroup->config.enableBlockingSocket != UA_TRUE)
-        UA_ReaderGroup_subscribeCallback(server, readerGroup);
+        UA_ReaderGroup_subscribeCallback(server, UA_DateTime_nowMonotonic(), readerGroup);
 
     return retval;
 }

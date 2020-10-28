@@ -317,7 +317,7 @@ UA_Subscription_nextSequenceNumber(UA_UInt32 sequenceNumber) {
 }
 
 static void
-publishCallback(UA_Server *server, UA_Subscription *sub) {
+publishCallback(UA_Server *server, UA_DateTime callbackTime, UA_Subscription *sub) {
     UA_LOCK(server->serviceMutex);
     sub->readyNotifications = sub->notificationQueueSize;
     UA_Subscription_publish(server, sub);

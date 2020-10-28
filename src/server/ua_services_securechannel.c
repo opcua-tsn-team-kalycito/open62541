@@ -18,7 +18,7 @@
 #endif
 
 static void
-removeSecureChannelCallback(void *_, channel_entry *entry) {
+removeSecureChannelCallback(void *_, UA_DateTime callbackTime, channel_entry *entry) {
     UA_SecureChannel_close(&entry->channel);
 }
 

@@ -265,7 +265,7 @@ sampleCallbackWithValue(UA_Server *server, UA_Session *session,
 }
 
 void
-UA_MonitoredItem_sampleCallback(UA_Server *server, UA_MonitoredItem *monitoredItem) {
+UA_MonitoredItem_sampleCallback(UA_Server *server, UA_DateTime callbackTime, UA_MonitoredItem *monitoredItem) {
     UA_LOCK(server->serviceMutex);
     monitoredItem_sampleCallback(server, monitoredItem);
     UA_UNLOCK(server->serviceMutex);

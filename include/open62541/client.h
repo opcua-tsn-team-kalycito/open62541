@@ -639,7 +639,7 @@ __UA_Client_AsyncServiceEx(UA_Client *client, const void *request,
  * Repeated callbacks can be attached to a client and will be executed in the
  * defined interval. */
 
-typedef void (*UA_ClientCallback)(UA_Client *client, void *data);
+typedef void (*UA_ClientCallback)(UA_Client *client, UA_DateTime callbackTime, void *data);
 
 /* Add a callback for execution at a specified time. If the indicated time lies
  * in the past, then the callback is executed at the next iteration of the

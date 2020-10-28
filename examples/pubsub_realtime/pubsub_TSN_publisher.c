@@ -936,7 +936,7 @@ void *publisherETF(void *arg) {
             *runningPub = UA_FALSE;
         transmission_time                              = ((UA_UInt64)nextnanosleeptime.tv_sec * SECONDS + (UA_UInt64)nextnanosleeptime.tv_nsec) + roundOffCycleTime + (UA_UInt64)(qbvOffset * 1000);
         ethernettransportSettings.transmission_time = transmission_time;
-        pubCallback(server, currentWriterGroup);
+        pubCallback(server, (UA_DateTime)transmission_time, currentWriterGroup);
         nextnanosleeptime.tv_nsec                     += (__syscall_slong_t)interval_ns;
         nanoSecondFieldConversion(&nextnanosleeptime);
     }
@@ -962,6 +962,7 @@ void *subscriber(void *arg) {
     UA_ServerCallback subCallback;
     struct timespec   nextnanosleeptimeSub;
     UA_UInt64         subInterval_ns;
+    UA_UInt64         receive_time;
 
     threadArg *threadArgumentsSubscriber = (threadArg *)arg;
     server             = threadArgumentsSubscriber->server;
@@ -979,8 +980,9 @@ void *subscriber(void *arg) {
         /* When blocking socket is disabled, the Subscriber threads wakes up at the start of each cycle */
         if (enableBlockingSocket != UA_TRUE)
             clock_nanosleep(CLOCKID, TIMER_ABSTIME, &nextnanosleeptimeSub, NULL);
+        receive_time = ((UA_UInt64)nextnanosleeptimeSub.tv_sec * SECONDS + (UA_UInt64)nextnanosleeptimeSub.tv_nsec);
         /* Read subscribed data from the SubscriberCounter variable */
-        subCallback(server, currentReaderGroup);
+        subCallback(server, (UA_DateTime)receive_time, currentReaderGroup);
         if (enableBlockingSocket != UA_TRUE) {
             nextnanosleeptimeSub.tv_nsec += (__syscall_slong_t)subInterval_ns;
             nanoSecondFieldConversion(&nextnanosleeptimeSub);
