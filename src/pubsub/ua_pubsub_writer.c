@@ -1862,8 +1862,8 @@ UA_DataSetWriter_generateDataSetMessage(UA_Server *server, UA_DataSetMessage *da
 }
 
 static UA_StatusCode
-sendNetworkMessageJson(UA_PubSubConnection *connection, UA_DataSetMessage *dsm,
-                       UA_UInt16 *writerIds, UA_Byte dsmCount,
+sendNetworkMessageJson(UA_Timer *timer, UA_PubSubConnection *connection, UA_DataSetMessage *dsm,
+                       UA_UInt16 *writerIds, UA_Byte dsmCount, UA_DateTime publishingTime,
                        UA_ExtensionObject *transportSettings) {
    UA_StatusCode retval = UA_STATUSCODE_BADNOTSUPPORTED;
 #ifdef UA_ENABLE_JSON_ENCODING
@@ -1904,7 +1904,7 @@ sendNetworkMessageJson(UA_PubSubConnection *connection, UA_DataSetMessage *dsm,
     }
 
     /* Send the prepared messages */
-    retval = connection->channel->send(connection->channel, transportSettings, &buf);
+    retval = connection->channel->send(connection->channel, timer, publishingTime, transportSettings, &buf);
     if(msgSize > UA_MAX_STACKBUF)
         UA_ByteString_clear(&buf);
 #endif
@@ -1987,19 +1987,19 @@ generateNetworkMessage(UA_PubSubConnection *connection, UA_WriterGroup *wg,
 
 static UA_StatusCode
 sendBufferedNetworkMessage(UA_Server *server, UA_PubSubConnection *connection,
-                           UA_NetworkMessageOffsetBuffer *buffer,
+                           UA_NetworkMessageOffsetBuffer *buffer, UA_DateTime publishingTime,
                            UA_ExtensionObject *transportSettings) {
     if(UA_NetworkMessage_updateBufferedMessage(buffer) != UA_STATUSCODE_GOOD)
         UA_LOG_DEBUG(&server->config.logger, UA_LOGCATEGORY_SERVER,
                      "PubSub sending. Unknown field type.");
-    return connection->channel->send(connection->channel,
+    return connection->channel->send(connection->channel, &server->timer, publishingTime,
                                      transportSettings, &buffer->buffer);
 }
 
 static UA_StatusCode
-sendNetworkMessage(UA_PubSubConnection *connection, UA_WriterGroup *wg,
+sendNetworkMessage(UA_Timer *timer, UA_PubSubConnection *connection, UA_WriterGroup *wg,
                    UA_DataSetMessage *dsm, UA_UInt16 *writerIds, UA_Byte dsmCount,
-                   UA_ExtensionObject *messageSettings,
+                   UA_ExtensionObject *messageSettings, UA_DateTime publishingTime,
                    UA_ExtensionObject *transportSettings) {
     UA_NetworkMessage nm;
     memset(&nm, 0, sizeof(UA_NetworkMessage));
@@ -2034,7 +2034,7 @@ sendNetworkMessage(UA_PubSubConnection *connection, UA_WriterGroup *wg,
     }
 
     /* Send the prepared messages */
-    retval = connection->channel->send(connection->channel, transportSettings, &buf);
+    retval = connection->channel->send(connection->channel, timer, publishingTime, transportSettings, &buf);
     if(msgSize > UA_MAX_STACKBUF)
         UA_ByteString_clear(&buf);
 
@@ -2049,7 +2049,7 @@ void
 UA_WriterGroup_publishCallback(UA_Server *server, UA_DateTime callbackTime, UA_WriterGroup *writerGroup) {
     UA_LOG_DEBUG(&server->config.logger, UA_LOGCATEGORY_SERVER, "Publish Callback");
 
-printf("Pub Time %ld\n", callbackTime);
+    // printf("Pub Time %ld\n", callbackTime);
     if(!writerGroup) {
         UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
                        "Publish failed. WriterGroup not found");
@@ -2079,9 +2079,15 @@ printf("Pub Time %ld\n", callbackTime);
     }
 
     if(writerGroup->config.rtLevel == UA_PUBSUB_RT_FIXED_SIZE) {
+        UA_UadpWriterGroupMessageDataType *wgm = (UA_UadpWriterGroupMessageDataType *) writerGroup->config.messageSettings.content.decoded.data;
+        if(wgm->publishingOffsetSize > 1)
+            UA_LOG_WARNING(&server->config.logger, UA_LOGCATEGORY_SERVER,
+                           "PublishingOffset array not supported in RT pubsub path. Initial publishingOffset value taken");
+
+        UA_DateTime publishingTime = callbackTime + (UA_DateTime)((*wgm->publishingOffset) * UA_DATETIME_MSEC);
         UA_StatusCode res =
             sendBufferedNetworkMessage(server, connection, &writerGroup->bufferedMessage,
-                                       &writerGroup->config.transportSettings);
+                                       publishingTime, &writerGroup->config.transportSettings);
         if(res == UA_STATUSCODE_GOOD) {
             writerGroup->sequenceNumber++;
         } else {
@@ -2133,14 +2139,16 @@ printf("Pub Time %ld\n", callbackTime);
             * are contained in the PublishedDataSet, then this DSM must go into a
             * dedicated NM as well. */
             if(pds->promotedFieldsCount > 0 || maxDSM == 1) {
+                UA_UadpWriterGroupMessageDataType *wgm = (UA_UadpWriterGroupMessageDataType *) writerGroup->config.messageSettings.content.decoded.data;
+                UA_DateTime publishingTime = callbackTime + (UA_DateTime)(wgm->publishingOffset[dsmCount] * UA_DATETIME_MSEC);
                 if(writerGroup->config.encodingMimeType == UA_PUBSUB_ENCODING_UADP){
-                    res = sendNetworkMessage(connection, writerGroup, &dsmStore[dsmCount],
+                    res = sendNetworkMessage(&server->timer, connection, writerGroup, &dsmStore[dsmCount],
                                             &dsw->config.dataSetWriterId, 1,
-                                            &writerGroup->config.messageSettings,
+                                            &writerGroup->config.messageSettings, publishingTime,
                                             &writerGroup->config.transportSettings);
                 } else if(writerGroup->config.encodingMimeType == UA_PUBSUB_ENCODING_JSON) {
-                    res = sendNetworkMessageJson(connection, &dsmStore[dsmCount],
-                                                &dsw->config.dataSetWriterId, 1,
+                    res = sendNetworkMessageJson(&server->timer, connection, &dsmStore[dsmCount],
+                                                &dsw->config.dataSetWriterId, 1, publishingTime,
                                                 &writerGroup->config.transportSettings);
                 }
 
@@ -2172,14 +2180,17 @@ printf("Pub Time %ld\n", callbackTime);
         if(i == nmCount - 1  && (dsmCount % maxDSM))
             nmDsmCount = (UA_Byte)dsmCount % maxDSM;
         UA_StatusCode res3 = UA_STATUSCODE_GOOD;
+        UA_UadpWriterGroupMessageDataType *wgm = (UA_UadpWriterGroupMessageDataType *) writerGroup->config.messageSettings.content.decoded.data;
+        /* TODO: PublishingOffset calculation of publish time */
+        UA_DateTime publishingTime = callbackTime + (UA_DateTime)(wgm->publishingOffset[i * maxDSM] * UA_DATETIME_MSEC);
         if(writerGroup->config.encodingMimeType == UA_PUBSUB_ENCODING_UADP){
-            res3 = sendNetworkMessage(connection, writerGroup, &dsmStore[i * maxDSM],
+            res3 = sendNetworkMessage(&server->timer, connection, writerGroup, &dsmStore[i * maxDSM],
                                       &dsWriterIds[i * maxDSM], nmDsmCount,
-                                      &writerGroup->config.messageSettings,
+                                      &writerGroup->config.messageSettings, publishingTime,
                                       &writerGroup->config.transportSettings);
         } else if(writerGroup->config.encodingMimeType == UA_PUBSUB_ENCODING_JSON){
-            res3 = sendNetworkMessageJson(connection, &dsmStore[i * maxDSM],
-                                          &dsWriterIds[i * maxDSM], nmDsmCount,
+            res3 = sendNetworkMessageJson(&server->timer, connection, &dsmStore[i * maxDSM],
+                                          &dsWriterIds[i * maxDSM], nmDsmCount, publishingTime,
                                           &writerGroup->config.transportSettings);
         }
 

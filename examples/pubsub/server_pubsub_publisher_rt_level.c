@@ -63,7 +63,7 @@ addMinimalPubSubConfiguration(UA_Server * server){
 }
 
 static void
-valueUpdateCallback(UA_Server *server, void *data) {
+valueUpdateCallback(UA_Server *server, UA_DateTime callbackTime, void *data) {
 #if defined PUBSUB_CONFIG_FASTPATH_FIXED_OFFSETS || defined PUBSUB_CONFIG_FASTPATH_STATIC_VALUES
     for (int i = 0; i < PUBSUB_CONFIG_FIELD_COUNT; ++i)
         *valueStore[i] = *valueStore[i] + 1;

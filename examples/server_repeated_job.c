@@ -9,7 +9,7 @@
 #include <stdlib.h>
 
 static void
-testCallback(UA_Server *server, void *data) {
+testCallback(UA_Server *server, UA_DateTime callbackTime, void *data) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "testcallback");
 }
 

@@ -23,7 +23,7 @@ _UA_BEGIN_DECLS
  * callbacks. */
 
 /* Callback where the application is either a client or a server */
-typedef void (*UA_ApplicationCallback)(void *application, void *data);
+typedef void (*UA_ApplicationCallback)(void *application, UA_DateTime callbackTime, void *data);
 
 typedef struct UA_TimerEntry {
     ZIP_ENTRY(UA_TimerEntry) zipfields;

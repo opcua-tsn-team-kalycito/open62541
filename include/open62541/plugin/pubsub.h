@@ -11,6 +11,9 @@
 #include <open62541/types.h>
 #include <open62541/types_generated.h>
 
+#include "open62541_queue.h"
+#include "ua_timer.h"
+
 _UA_BEGIN_DECLS
 
 #ifdef UA_ENABLE_PUBSUB
@@ -45,6 +48,16 @@ typedef enum {
     UA_PUBSUB_CHANNEL_CLOSED
 } UA_PubSubChannelState;
 
+typedef struct UA_PublishEntry {
+    LIST_ENTRY(UA_PublishEntry) listEntry;
+    UA_ByteString buffer;
+} UA_PublishEntry;
+
+typedef struct {
+    LIST_HEAD(, UA_PublishEntry) sendBuffers;
+    void (*timedSend)(UA_PubSubChannel *channel, UA_DateTime callbackTime, UA_PublishEntry *publishPacket);
+} UA_PubSubTimedSend;
+
 /* Interface structure between network plugin and internal implementation */
 struct UA_PubSubChannel {
     UA_UInt32 publisherId; /* unique identifier */
@@ -56,9 +69,10 @@ struct UA_PubSubChannel {
     * UA_PubSubChannelData[ImplementationName] This structure can be used by the
     * network implementation to store network implementation specific data.*/
 
+    UA_PubSubTimedSend pubsubTimedSend;
     /* Sending out the content of the buf parameter */
-    UA_StatusCode (*send)(UA_PubSubChannel *channel, UA_ExtensionObject *transportSettings,
-                          const UA_ByteString *buf);
+    UA_StatusCode (*send)(UA_PubSubChannel *channel, UA_Timer *timer, UA_DateTime publishingTime,
+                          UA_ExtensionObject *transportSettings, const UA_ByteString *buf);
 
     /* Register to an specified message source, e.g. multicast group or topic. Callback is used for mqtt. */
     UA_StatusCode (*regist)(UA_PubSubChannel * channel, UA_ExtensionObject *transportSettings,

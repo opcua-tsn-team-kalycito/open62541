@@ -96,13 +96,13 @@ externalDataReadNotificationCallback(UA_Server *server, const UA_NodeId *session
 }
 
 static void
-cyclicValueUpdateCallback_UpdateToMemory(UA_Server *server, void *data) {
+cyclicValueUpdateCallback_UpdateToMemory(UA_Server *server, UA_DateTime callbackTime, void *data) {
     *integerRTValue = (*integerRTValue)+1;
     *integerRTValue2 = (*integerRTValue2)+1;
 }
 
 static void
-cyclicValueUpdateCallback_UpdateToStack(UA_Server *server, void *data) {
+cyclicValueUpdateCallback_UpdateToStack(UA_Server *server, UA_DateTime callbackTime, void *data) {
     UA_Variant valueToWrite;
     UA_UInt32 newValue = (*integerRTValue)+10;
     UA_Variant_setScalar(&valueToWrite, &newValue, &UA_TYPES[UA_TYPES_UINT32]);

@@ -182,7 +182,7 @@ cleanup:
 
 static void
 serverExecuteRepeatedCallback(UA_Server *server, UA_ApplicationCallback cb,
-                              void *callbackApplication, void *data);
+                              void *callbackApplication, UA_DateTime callbackTime, void *data);
 
 /* The server needs to be stopped before it can be deleted */
 void UA_Server_delete(UA_Server *server) {

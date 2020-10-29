@@ -24,6 +24,9 @@ typedef struct {
     UA_UInt64  transmission_time;
 } UA_EthernetWriterGroupTransportDataType;
 
+void
+timedEthernetPublish(UA_PubSubChannel *channel, UA_DateTime publishTime, UA_PublishEntry *publishPacket);
+
 UA_PubSubTransportLayer UA_EXPORT
 UA_PubSubTransportLayerEthernet(void);
 

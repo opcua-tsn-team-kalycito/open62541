@@ -61,7 +61,7 @@ static UA_UInt32 ds2UInt32ArrValue[10] = { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90
 UA_NodeId connectionIdent;
 
 void
-timerCallback(UA_Server *server, void *data);
+timerCallback(UA_Server *server, UA_DateTime callbackTime, void *data);
 
 static void
 addPubSubConnection(UA_Server *server, UA_String *transportProfile,
@@ -558,7 +558,7 @@ static void addPublisher2(UA_Server *server, UA_NodeId publishedDataSetId) {
 }
 
 void
-timerCallback(UA_Server *server, void *data) {
+timerCallback(UA_Server *server, UA_DateTime callbackTime, void *data) {
     // DataSet 1
     // BoolToggle
     ds1BoolToggleCount++;
