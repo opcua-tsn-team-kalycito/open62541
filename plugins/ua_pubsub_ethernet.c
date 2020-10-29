@@ -461,7 +461,6 @@ sendWithTxTime(UA_PubSubChannel *channel, UA_ExtensionObject *transportSettings,
  * Publish at the exact time interval using timed callbacks
  */
 void timedEthernetPublish(UA_PubSubChannel *channel, UA_DateTime callbackTime, UA_PublishEntry *publishPacket) {
-    // printf("Publish time %ld\n", callbackTime);
     ssize_t rc;
     rc = UA_send(channel->sockfd, (char *)publishPacket->buffer.data, publishPacket->buffer.length, 0);
     if(rc  < 0) {

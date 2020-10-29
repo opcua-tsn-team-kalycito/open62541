@@ -2049,7 +2049,6 @@ void
 UA_WriterGroup_publishCallback(UA_Server *server, UA_DateTime callbackTime, UA_WriterGroup *writerGroup) {
     UA_LOG_DEBUG(&server->config.logger, UA_LOGCATEGORY_SERVER, "Publish Callback");
 
-    // printf("Pub Time %ld\n", callbackTime);
     if(!writerGroup) {
         UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
                        "Publish failed. WriterGroup not found");
