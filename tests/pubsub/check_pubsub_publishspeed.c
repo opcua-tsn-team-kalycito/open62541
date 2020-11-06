@@ -84,7 +84,7 @@ START_TEST(PublishSpeedTest) {
     begin = clock();
 
     for(int i = 0; i < 8000; i++) {
-        UA_WriterGroup_publishCallback(server, wg);
+        UA_WriterGroup_publishCallback(server, UA_DateTime_nowMonotonic(), wg);
     }
 
     finish = clock();

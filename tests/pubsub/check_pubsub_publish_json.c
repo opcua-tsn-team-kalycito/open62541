@@ -85,7 +85,7 @@ START_TEST(SinglePublishDataSetField){
 
         UA_WriterGroup *wg = UA_WriterGroup_findWGbyId(server, writerGroup1);
         ck_assert(wg != 0);
-        UA_WriterGroup_publishCallback(server, wg);
+        UA_WriterGroup_publishCallback(server, UA_DateTime_nowMonotonic(), wg);
     } END_TEST
 
 int main(void) {

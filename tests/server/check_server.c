@@ -46,7 +46,7 @@ START_TEST(checkGetNamespaceByName) {
     ck_assert_uint_eq(found, UA_STATUSCODE_GOOD);
 } END_TEST
 
-static void timedCallbackHandler(UA_Server *s, void *data) {
+static void timedCallbackHandler(UA_Server *s, UA_DateTime callbackTime, void *data) {
     *((UA_Boolean*)data) = false;  // stop the server via a timedCallback
 }
 

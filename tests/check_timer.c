@@ -13,14 +13,14 @@
 size_t count = 0;
 
 static void
-timerCallback(void *application, void *data) {
+timerCallback(void *application, UA_DateTime callbackTime, void *data) {
     count++;
 }
 
 static void
 executionCallback(void *executionApplication, UA_ApplicationCallback cb,
-                  void *callbackApplication, void *data) {
-    cb(callbackApplication, data);
+                  void *callbackApplication, UA_DateTime callbackTime, void *data) {
+    cb(callbackApplication, callbackTime, data);
 }
 
 /* Create empty events with different callback intervals */

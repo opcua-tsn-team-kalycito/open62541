@@ -124,6 +124,15 @@ UA_PubSubConnection_clear(UA_Server *server, UA_PubSubConnection *connection) {
         UA_Server_removeReaderGroup(server, readerGroups->identifier);
 
     UA_NodeId_clear(&connection->identifier);
+
+    /* Clear if any holding packets */
+    UA_PublishEntry *timedPublishFrames, *tmpPublishFrames;
+    LIST_FOREACH_SAFE(timedPublishFrames, &connection->channel->pubsubTimedSend.sendBuffers, listEntry, tmpPublishFrames) {
+        UA_ByteString_clear(&timedPublishFrames->buffer);
+        LIST_REMOVE(timedPublishFrames, listEntry);
+        UA_free(timedPublishFrames);
+    }
+
     if(connection->channel)
         connection->channel->close(connection->channel);
 
@@ -2083,7 +2092,12 @@ UA_WriterGroup_publishCallback(UA_Server *server, UA_DateTime callbackTime, UA_W
             UA_LOG_WARNING(&server->config.logger, UA_LOGCATEGORY_SERVER,
                            "PublishingOffset array not supported in RT pubsub path. Initial publishingOffset value taken");
 
-        UA_DateTime publishingTime = callbackTime + (UA_DateTime)((*wgm->publishingOffset) * UA_DATETIME_MSEC);
+        UA_DateTime publishingTime;
+        if(writerGroup->config.timerPrecision == UA_PUBSUB_NANOSECOND_PRECISION)
+            publishingTime = callbackTime + (UA_DateTime)((*wgm->publishingOffset) * UA_DATETIME_MSEC * 100); /* Convert to 1 nano second accuracy - should be handled by external callbacks */
+        else
+            publishingTime = callbackTime + (UA_DateTime)((*wgm->publishingOffset) * UA_DATETIME_MSEC);
+
         UA_StatusCode res =
             sendBufferedNetworkMessage(server, connection, &writerGroup->bufferedMessage,
                                        publishingTime, &writerGroup->config.transportSettings);
@@ -2139,7 +2153,12 @@ UA_WriterGroup_publishCallback(UA_Server *server, UA_DateTime callbackTime, UA_W
             * dedicated NM as well. */
             if(pds->promotedFieldsCount > 0 || maxDSM == 1) {
                 UA_UadpWriterGroupMessageDataType *wgm = (UA_UadpWriterGroupMessageDataType *) writerGroup->config.messageSettings.content.decoded.data;
-                UA_DateTime publishingTime = callbackTime + (UA_DateTime)(wgm->publishingOffset[dsmCount] * UA_DATETIME_MSEC);
+                UA_DateTime publishingTime;
+                if(writerGroup->config.timerPrecision == UA_PUBSUB_NANOSECOND_PRECISION)
+                    publishingTime = callbackTime + (UA_DateTime)(wgm->publishingOffset[dsmCount] * UA_DATETIME_MSEC * 100); /* Convert to 1 nano second accuracy - should be handled by external callbacks */
+                else
+                    publishingTime = callbackTime + (UA_DateTime)(wgm->publishingOffset[dsmCount] * UA_DATETIME_MSEC);
+
                 if(writerGroup->config.encodingMimeType == UA_PUBSUB_ENCODING_UADP){
                     res = sendNetworkMessage(&server->timer, connection, writerGroup, &dsmStore[dsmCount],
                                             &dsw->config.dataSetWriterId, 1,
@@ -2181,7 +2200,12 @@ UA_WriterGroup_publishCallback(UA_Server *server, UA_DateTime callbackTime, UA_W
         UA_StatusCode res3 = UA_STATUSCODE_GOOD;
         UA_UadpWriterGroupMessageDataType *wgm = (UA_UadpWriterGroupMessageDataType *) writerGroup->config.messageSettings.content.decoded.data;
         /* TODO: PublishingOffset calculation of publish time */
-        UA_DateTime publishingTime = callbackTime + (UA_DateTime)(wgm->publishingOffset[i * maxDSM] * UA_DATETIME_MSEC);
+        UA_DateTime publishingTime;
+        if(writerGroup->config.timerPrecision == UA_PUBSUB_NANOSECOND_PRECISION)
+            publishingTime = callbackTime + (UA_DateTime)(wgm->publishingOffset[i * maxDSM] * UA_DATETIME_MSEC * 100); /* Convert to 1 nano second accuracy - should be handled by external callbacks */
+        else
+            publishingTime = callbackTime + (UA_DateTime)(wgm->publishingOffset[i * maxDSM] * UA_DATETIME_MSEC);
+
         if(writerGroup->config.encodingMimeType == UA_PUBSUB_ENCODING_UADP){
             res3 = sendNetworkMessage(&server->timer, connection, writerGroup, &dsmStore[i * maxDSM],
                                       &dsWriterIds[i * maxDSM], nmDsmCount,

@@ -460,6 +460,11 @@ typedef enum {
     UA_PUBSUB_RT_DETERMINISTIC = 4,
 } UA_PubSubRTLevel;
 
+typedef enum {
+    UA_PUBSUB_DATETIME_PRECISION, /* Precision upto 100 nano-seconds - Internal timer */
+    UA_PUBSUB_NANOSECOND_PRECISION, /* Precision upto 1 nano-second - The callbacks has to handled externally using external callbacks */
+} UA_PubSubTimerPrecision;
+
 typedef struct {
     UA_String name;
     UA_Boolean enabled;
@@ -480,6 +485,7 @@ typedef struct {
     UA_UInt16 maxEncapsulatedDataSetMessageCount;
     /* non std. field */
     UA_PubSubRTLevel rtLevel;
+    UA_PubSubTimerPrecision timerPrecision; // Necessary for PublishingOffset calculation
 } UA_WriterGroupConfig;
 
 void UA_EXPORT
@@ -702,6 +708,7 @@ typedef struct {
     UA_Boolean enableBlockingSocket; // To enable or disable blocking socket option
     UA_UInt32 timeout; // Timeout for receive to wait for the packets
     UA_PubSubRTLevel rtLevel;
+    UA_PubSubTimerPrecision timerPrecision; // Necessary for ReceiveOffset calculation - TODO
 } UA_ReaderGroupConfig;
 
 void UA_EXPORT

@@ -46,7 +46,7 @@ UA_DataSetReaderConfig readerConfig;
 /* Cycle time in milliseconds */
 #define             DEFAULT_CYCLE_TIME                    0.25
 /* Qbv offset */
-#define             QBV_OFFSET                            25 * 1000
+#define             QBV_OFFSET                            25
 #define             DEFAULT_SOCKET_PRIORITY               3
 #define             PUBLISHER_ID_SUB                      2234
 #define             WRITER_GROUP_ID_SUB                   101
@@ -413,9 +413,10 @@ updateMeasurementsSubscriber(struct timespec receive_time, UA_UInt64 counterValu
  */
 void *subscriber(void *arg) {
     UA_Server*        server;
-    UA_ReaderGroup*   currentReaderGroup;
+    void*             currentReaderGroup;
     UA_ServerCallback subCallback;
     struct timespec   nextnanosleeptimeSub;
+    UA_DateTime       receive_time;
 
     threadArg *threadArgumentsSubscriber = (threadArg *)arg;
     server                               = threadArgumentsSubscriber->server;
@@ -430,8 +431,9 @@ void *subscriber(void *arg) {
     nanoSecondFieldConversion(&nextnanosleeptimeSub);
     while (running) {
         clock_nanosleep(CLOCKID, TIMER_ABSTIME, &nextnanosleeptimeSub, NULL);
+        receive_time = ((UA_DateTime)nextnanosleeptimeSub.tv_sec * SECONDS + (UA_DateTime)nextnanosleeptimeSub.tv_nsec);
         /* Read subscribed data from the SubscriberCounter variable */
-        subCallback(server, currentReaderGroup);
+        subCallback(server, receive_time, currentReaderGroup);
         nextnanosleeptimeSub.tv_nsec += (__syscall_slong_t)(cycleTimeMsec * MILLI_SECONDS);
         nanoSecondFieldConversion(&nextnanosleeptimeSub);
     }

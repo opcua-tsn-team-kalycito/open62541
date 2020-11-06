@@ -334,6 +334,9 @@ UA_PubSubChannelUDPMC_open(const UA_PubSubConnectionConfig *connectionConfig) {
 #endif
     }
 
+    LIST_INIT(&newChannel->pubsubTimedSend.sendBuffers);
+    newChannel->pubsubTimedSend.timedSend = timedUdpPublish;
+
     UA_freeaddrinfo(requestResult);
     newChannel->state = UA_PUBSUB_CHANNEL_PUB;
     return newChannel;
@@ -424,6 +427,31 @@ UA_PubSubChannelUDPMC_unregist(UA_PubSubChannel *channel, UA_ExtensionObject *tr
 }
 
 /**
+ * Publish at the exact time interval using timed callbacks
+ */
+void timedUdpPublish(UA_PubSubChannel *channel, UA_DateTime callbackTime, UA_PublishEntry *publishPacket) {
+    UA_PubSubChannelDataUDPMC *channelConfigUDPMC = (UA_PubSubChannelDataUDPMC *) channel->handle;
+    long nWritten = 0;
+    while (nWritten < (long)publishPacket->buffer.length) {
+        long n = (long)UA_sendto(channel->sockfd, publishPacket->buffer.data,
+                                 publishPacket->buffer.length, 0,
+                                 (struct sockaddr *) channelConfigUDPMC->ai_addr,
+                                 sizeof(struct sockaddr_storage));
+        if(n == -1L) {
+            UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PubSub Connection Timed send failed.");
+            return;
+        }
+
+        nWritten += n;
+    }
+
+    UA_ByteString_clear(&publishPacket->buffer);
+    LIST_REMOVE(publishPacket, listEntry);
+    UA_free(publishPacket);
+    return;
+}
+
+/**
  * Send messages to the connection defined address
  *
  * @return UA_STATUSCODE_GOOD if success
@@ -440,18 +468,34 @@ UA_PubSubChannelUDPMC_send(UA_PubSubChannel *channel,
         return UA_STATUSCODE_BADINTERNALERROR;
     }
     //TODO evalute: chunk messages or check against MTU?
-    //TODO: Handle the publish at the publish time
-    long nWritten = 0;
-    while (nWritten < (long)buf->length) {
-        long n = (long)UA_sendto(channel->sockfd, buf->data, buf->length, 0,
-                                 (struct sockaddr *) channelConfigUDPMC->ai_addr,
-                                 sizeof(struct sockaddr_storage));
-        if(n == -1L) {
-            UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PubSub Connection sending failed.");
-            return UA_STATUSCODE_BADINTERNALERROR;
+    UA_DateTime currentTime = UA_DateTime_nowMonotonic();
+    if((currentTime + UA_DATETIME_MSEC) > publishTime) {
+        long nWritten = 0;
+        while (nWritten < (long)buf->length) {
+            long n = (long)UA_sendto(channel->sockfd, buf->data, buf->length, 0,
+                                     (struct sockaddr *) channelConfigUDPMC->ai_addr,
+                                     sizeof(struct sockaddr_storage));
+            if(n == -1L) {
+                UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PubSub Connection sending failed.");
+                return UA_STATUSCODE_BADINTERNALERROR;
+            }
+
+            nWritten += n;
         }
-        nWritten += n;
     }
+    else {
+        UA_UInt64 callbackId;
+        UA_PublishEntry *publishPacket = (UA_PublishEntry *) UA_calloc(1, sizeof(UA_PublishEntry));
+        char *bufSend = (char*) UA_malloc(buf->length);
+        memcpy(bufSend, buf->data, buf->length);
+        publishPacket->buffer.data = (UA_Byte *)bufSend;
+        publishPacket->buffer.length = buf->length;
+        LIST_INSERT_HEAD(&channel->pubsubTimedSend.sendBuffers, publishPacket, listEntry);
+        UA_Timer_addTimedCallback(timer, (UA_ApplicationCallback)channel->pubsubTimedSend.timedSend, channel,
+                                  publishPacket, publishTime,
+                                  &callbackId);
+    }
+
     return UA_STATUSCODE_GOOD;
 }
 

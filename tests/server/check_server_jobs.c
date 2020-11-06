@@ -25,7 +25,7 @@ static void teardown(void) {
 }
 
 static void
-dummyCallback(UA_Server *serverPtr, void *data) {
+dummyCallback(UA_Server *serverPtr, UA_DateTime callbackTime, void *data) {
     *executed = true;
 }
 
@@ -52,7 +52,7 @@ END_TEST
 UA_UInt64 *cbId;
 
 static void
-removeItselfCallback(UA_Server *serverPtr, void *data) {
+removeItselfCallback(UA_Server *serverPtr, UA_DateTime callbackTime, void *data) {
     UA_Server_removeRepeatedCallback(serverPtr, *cbId);
 }
 

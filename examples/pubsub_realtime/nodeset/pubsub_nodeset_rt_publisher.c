@@ -43,7 +43,7 @@
 /* Cycle time in milliseconds */
 #define             DEFAULT_CYCLE_TIME                    0.25
 /* Qbv offset */
-#define             QBV_OFFSET                            25 * 1000
+#define             QBV_OFFSET                            25
 #define             DEFAULT_SOCKET_PRIORITY               3
 #define             PUBLISHER_ID                          2234
 #define             WRITER_GROUP_ID                       101
@@ -369,6 +369,10 @@ addWriterGroup(UA_Server *server) {
                                                               (UA_UadpNetworkMessageContentMask)UA_UADPNETWORKMESSAGECONTENTMASK_GROUPHEADER |
                                                               (UA_UadpNetworkMessageContentMask)UA_UADPNETWORKMESSAGECONTENTMASK_WRITERGROUPID |
                                                               (UA_UadpNetworkMessageContentMask)UA_UADPNETWORKMESSAGECONTENTMASK_PAYLOADHEADER);
+    /* Set publishingOffset to publish at the particular offset of the cycle */
+    writerGroupMessage->publishingOffset = (UA_Double *) UA_calloc(1, sizeof(UA_Double));
+    writerGroupMessage->publishingOffsetSize = 1;
+    *writerGroupMessage->publishingOffset = QBV_OFFSET; // Set offset of 25us
     writerGroupConfig.messageSettings.content.decoded.data = writerGroupMessage;
     UA_Server_addWriterGroup(server, connectionIdent, &writerGroupConfig, &writerGroupIdent);
     UA_Server_setWriterGroupOperational(server, writerGroupIdent);
@@ -421,7 +425,7 @@ void *publisherETF(void *arg) {
     struct timespec   nextnanosleeptime;
     UA_ServerCallback pubCallback;
     UA_Server*        server;
-    UA_WriterGroup*   currentWriterGroup;
+    void*             currentWriterGroup;
     UA_UInt64         interval_ns;
     UA_UInt64         transmission_time;
 
@@ -440,25 +444,12 @@ void *publisherETF(void *arg) {
     nextnanosleeptime.tv_sec                      += SECONDS_SLEEP;
     nextnanosleeptime.tv_nsec                      = (__syscall_slong_t)(cycleTimeMsec * pubWakeupPercentage * MILLI_SECONDS);
     nanoSecondFieldConversion(&nextnanosleeptime);
-
-    /* Define Ethernet ETF transport settings */
-    UA_EthernetWriterGroupTransportDataType ethernettransportSettings;
-    memset(&ethernettransportSettings, 0, sizeof(UA_EthernetWriterGroupTransportDataType));
-    ethernettransportSettings.transmission_time = 0;
-
-    /* Encapsulate ETF config in transportSettings */
-    UA_ExtensionObject transportSettings;
-    memset(&transportSettings, 0, sizeof(UA_ExtensionObject));
-    /* TODO: transportSettings encoding and type to be defined */
-    transportSettings.content.decoded.data       = &ethernettransportSettings;
-    currentWriterGroup->config.transportSettings = transportSettings;
-    UA_UInt64 roundOffCycleTime                  = (UA_UInt64)((cycleTimeMsec * MILLI_SECONDS) - (cycleTimeMsec * pubWakeupPercentage * MILLI_SECONDS));
+    UA_UInt64 roundOffCycleTime                  = (UA_UInt64)((cycleTimeMsec * MILLI_SECONDS) - (cycleTimeMsec * MILLI_SECONDS * pubWakeupPercentage));
 
     while (running) {
         clock_nanosleep(CLOCKID, TIMER_ABSTIME, &nextnanosleeptime, NULL);
-        transmission_time                           = ((UA_UInt64)nextnanosleeptime.tv_sec * SECONDS + (UA_UInt64)nextnanosleeptime.tv_nsec) + roundOffCycleTime + QBV_OFFSET;
-        ethernettransportSettings.transmission_time = transmission_time;
-        pubCallback(server, currentWriterGroup);
+        transmission_time = ((UA_UInt64)nextnanosleeptime.tv_sec * SECONDS + (UA_UInt64)nextnanosleeptime.tv_nsec) + roundOffCycleTime;
+        pubCallback(server, (UA_DateTime) transmission_time, currentWriterGroup);
         nextnanosleeptime.tv_nsec                   += (__syscall_slong_t)interval_ns;
         nanoSecondFieldConversion(&nextnanosleeptime);
     }

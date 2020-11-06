@@ -398,7 +398,7 @@ START_TEST(SinglePublishDataSetField){
         UA_Server_addDataSetField(server, publishedDataSet1, &dataSetFieldConfig, NULL);
 
         UA_WriterGroup *wg = UA_WriterGroup_findWGbyId(server, writerGroup1);
-        UA_WriterGroup_publishCallback(server, wg);
+        UA_WriterGroup_publishCallback(server, UA_DateTime_nowMonotonic(), wg);
     } END_TEST
 
 START_TEST(PublishDataSetFieldAsDeltaFrame){
@@ -418,11 +418,11 @@ START_TEST(PublishDataSetFieldAsDeltaFrame){
             UA_DataSetWriter *dsw = UA_DataSetWriter_findDSWbyId(server, dataSetWriter1);
             dsw->config.keyFrameCount = 3;
 
-            UA_WriterGroup_publishCallback(server, wg);
-            UA_WriterGroup_publishCallback(server, wg);
-            UA_WriterGroup_publishCallback(server, wg);
-            UA_WriterGroup_publishCallback(server, wg);
-            UA_WriterGroup_publishCallback(server, wg);
+            UA_WriterGroup_publishCallback(server, UA_DateTime_nowMonotonic(), wg);
+            UA_WriterGroup_publishCallback(server, UA_DateTime_nowMonotonic(), wg);
+            UA_WriterGroup_publishCallback(server, UA_DateTime_nowMonotonic(), wg);
+            UA_WriterGroup_publishCallback(server, UA_DateTime_nowMonotonic(), wg);
+            UA_WriterGroup_publishCallback(server, UA_DateTime_nowMonotonic(), wg);
         } END_TEST
 
 int main(void) {

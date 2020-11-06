@@ -86,7 +86,7 @@ START_TEST(monitorIntegerNoChanges) {
     begin = clock();
 
     for(int i = 0; i < 1000; i++) {
-        UA_MonitoredItem_sampleCallback(server, mon);
+        UA_MonitoredItem_sampleCallback(server, UA_DateTime_nowMonotonic(), mon);
     }
 
     finish = clock();

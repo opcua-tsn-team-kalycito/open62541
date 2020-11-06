@@ -396,7 +396,7 @@ UA_PubSubChannelEthernet_unregist(UA_PubSubChannel *channel,
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,19,0)
 static UA_StatusCode
-sendWithTxTime(UA_PubSubChannel *channel, UA_ExtensionObject *transportSettings, void *bufSend, size_t lenBuf) {
+sendWithTxTime(UA_PubSubChannel *channel, UA_DateTime publishTime, void *bufSend, size_t lenBuf) {
     /* Send the data packet with the tx time */
     char dataPacket[CMSG_SPACE(sizeof(UA_UInt64))] = {0};
     /* Structure for messages sent and received */
@@ -427,10 +427,6 @@ sendWithTxTime(UA_PubSubChannel *channel, UA_ExtensionObject *transportSettings,
     /* Provide the number of elements in the array */
     message.msg_iovlen        = 1;
 
-    /* Get ethernet ETF transport settings */
-    UA_EthernetWriterGroupTransportDataType *ethernettransportSettings;
-    ethernettransportSettings = (UA_EthernetWriterGroupTransportDataType *)transportSettings->content.decoded.data;
-
     /*
      * We specify the transmission time in the CMSG.
      */
@@ -445,8 +441,8 @@ sendWithTxTime(UA_PubSubChannel *channel, UA_ExtensionObject *transportSettings,
     controlMsg->cmsg_level = SOL_SOCKET;
     controlMsg->cmsg_type  = SCM_TXTIME;
     controlMsg->cmsg_len   = CMSG_LEN(sizeof(UA_UInt64));
-    if(ethernettransportSettings && (ethernettransportSettings->transmission_time != 0))
-        *((UA_UInt64 *) CMSG_DATA(controlMsg)) = ethernettransportSettings->transmission_time;
+    if(publishTime >= 0)
+        *((UA_UInt64 *) CMSG_DATA(controlMsg)) = (UA_UInt64)publishTime;
 
     msgCount = sendmsg(channel->sockfd, &message, 0);
     if ((msgCount < 1) && (msgCount != (UA_Int32)lenBuf)) {
@@ -544,21 +540,10 @@ UA_PubSubChannelEthernet_send(UA_PubSubChannel *channel,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,19,0)
     if(channelDataEthernet->useSoTxTime) {
         /* Send the packets at the given Txtime */
-        UA_StatusCode rc = sendWithTxTime(channel, transportSettings, bufSend, lenBuf);
+        UA_StatusCode rc = sendWithTxTime(channel, publishTime, bufSend, lenBuf);
         if(rc != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                          "PubSub connection send failed. Send message failed.");
-            UA_free(bufSend);
-            return UA_STATUSCODE_BADINTERNALERROR;
-        }
-    UA_DateTime currentTime = UA_DateTime_nowMonotonic();
-    if((currentTime + UA_DATETIME_MSEC) > publishTime) {
-        /* Send out the packets if the publish time is less than 1ms ahead of the current time - Internal timers will not support this */
-        ssize_t rc;
-        rc = UA_send(channel->sockfd, bufSend, lenBuf, 0);
-        if(rc  < 0) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-                "PubSub connection send failed. Send message failed.");
             UA_free(bufSend);
             return UA_STATUSCODE_BADINTERNALERROR;
         }
@@ -592,7 +577,9 @@ UA_PubSubChannelEthernet_send(UA_PubSubChannel *channel,
                                       publishPacket, publishTime,
                                       &callbackId);
         }
-    }    return UA_STATUSCODE_GOOD;
+    }
+
+    return UA_STATUSCODE_GOOD;
 }
 
 /**

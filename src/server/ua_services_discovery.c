@@ -542,7 +542,7 @@ void UA_Discovery_cleanupTimedOut(UA_Server *server, UA_DateTime nowMonotonic) {
  * We will do so by using the additional data parameter which holds information
  * if the next interval is default or if it is a repeated call. */
 static void
-periodicServerRegister(UA_Server *server, void *data) {
+periodicServerRegister(UA_Server *server, UA_DateTime callbackTime, void *data) {
     UA_assert(data != NULL);
     UA_LOCK(server->serviceMutex);
 

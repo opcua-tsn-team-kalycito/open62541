@@ -80,8 +80,6 @@
 #include <open62541/types_generated.h>
 #include <open62541/plugin/pubsub_ethernet.h>
 
-#include "ua_pubsub.h"
-
 #if defined (UA_ENABLE_PUBSUB_ETH_UADP_XDP)
 #include <open62541/plugin/pubsub_ethernet_xdp.h>
 #include <linux/if_link.h>
@@ -104,7 +102,7 @@ UA_DataSetReaderConfig readerConfig;
 /* Cycle time in milliseconds */
 #define             DEFAULT_CYCLE_TIME                    0.25
 /* Qbv offset */
-#define             DEFAULT_QBV_OFFSET                    125
+#define             DEFAULT_QBV_OFFSET                    0.125
 #define             DEFAULT_SOCKET_PRIORITY               3
 #if defined(PUBLISHER)
 #define             PUBLISHER_ID                          2234
@@ -171,7 +169,7 @@ static UA_Int32   userAppPriority      = DEFAULT_USERAPPLICATION_SCHED_PRIORITY;
 static UA_Int32   pubCore              = DEFAULT_PUB_CORE;
 static UA_Int32   subCore              = DEFAULT_SUB_CORE;
 static UA_Int32   userAppCore          = DEFAULT_USER_APP_CORE;
-static UA_Int32   qbvOffset            = DEFAULT_QBV_OFFSET;
+static UA_Double  qbvOffset            = DEFAULT_QBV_OFFSET;
 static UA_Boolean disableSoTxtime      = UA_TRUE;
 static UA_Boolean enableCsvLog         = UA_FALSE;
 static UA_Boolean enableLatencyCsvLog  = UA_FALSE;
@@ -791,6 +789,7 @@ addWriterGroup(UA_Server *server) {
     writerGroupConfig.enabled            = UA_FALSE;
     writerGroupConfig.encodingMimeType   = UA_PUBSUB_ENCODING_UADP;
     writerGroupConfig.writerGroupId      = WRITER_GROUP_ID;
+    writerGroupConfig.timerPrecision     = UA_PUBSUB_NANOSECOND_PRECISION;
     writerGroupConfig.rtLevel            = UA_PUBSUB_RT_FIXED_SIZE;
 
     writerGroupConfig.pubsubManagerCallback.addCustomCallback = addPubSubApplicationCallback;
@@ -811,6 +810,10 @@ addWriterGroup(UA_Server *server) {
                                                               (UA_UadpNetworkMessageContentMask)UA_UADPNETWORKMESSAGECONTENTMASK_GROUPHEADER |
                                                               (UA_UadpNetworkMessageContentMask)UA_UADPNETWORKMESSAGECONTENTMASK_WRITERGROUPID |
                                                               (UA_UadpNetworkMessageContentMask)UA_UADPNETWORKMESSAGECONTENTMASK_PAYLOADHEADER);
+    /* Set publishingOffset to publish at the particular offset of the cycle */
+    writerGroupMessage->publishingOffset = (UA_Double *) UA_calloc(1, sizeof(UA_Double));
+    writerGroupMessage->publishingOffsetSize = 1;
+    *writerGroupMessage->publishingOffset = qbvOffset; // Set offset of 125us
     writerGroupConfig.messageSettings.content.decoded.data = writerGroupMessage;
     UA_Server_addWriterGroup(server, connectionIdent, &writerGroupConfig, &writerGroupIdent);
     UA_Server_setWriterGroupOperational(server, writerGroupIdent);
@@ -897,9 +900,9 @@ void *publisherETF(void *arg) {
     struct timespec   nextnanosleeptime;
     UA_ServerCallback pubCallback;
     UA_Server*        server;
-    UA_WriterGroup*   currentWriterGroup; // TODO: Remove WriterGroup Usage
+    void*             currentWriterGroup;
     UA_UInt64         interval_ns;
-    UA_UInt64         transmission_time;
+    UA_DateTime       transmission_time;
 
     /* Initialise value for nextnanosleeptime timespec */
     nextnanosleeptime.tv_nsec                      = 0;
@@ -907,7 +910,7 @@ void *publisherETF(void *arg) {
     threadArg *threadArgumentsPublisher = (threadArg *)arg;
     server                              = threadArgumentsPublisher->server;
     pubCallback                         = threadArgumentsPublisher->callback;
-    currentWriterGroup                  = (UA_WriterGroup *)threadArgumentsPublisher->data;
+    currentWriterGroup                  = (void *)threadArgumentsPublisher->data;
     interval_ns                         = (UA_UInt64)(threadArgumentsPublisher->interval_ms * MILLI_SECONDS);
 
     /* Get current time and compute the next nanosleeptime */
@@ -916,26 +919,14 @@ void *publisherETF(void *arg) {
     nextnanosleeptime.tv_sec                      += SECONDS_SLEEP;
     nextnanosleeptime.tv_nsec                      = (__syscall_slong_t)(cycleTimeInMsec * MILLI_SECONDS * pubWakeupPercentage);
     nanoSecondFieldConversion(&nextnanosleeptime);
-
-    /* Define Ethernet ETF transport settings */
-    UA_EthernetWriterGroupTransportDataType ethernettransportSettings;
-    memset(&ethernettransportSettings, 0, sizeof(UA_EthernetWriterGroupTransportDataType));
-    ethernettransportSettings.transmission_time = 0;
-
-    /* Encapsulate ETF config in transportSettings */
-    UA_ExtensionObject transportSettings;
-    memset(&transportSettings, 0, sizeof(UA_ExtensionObject));
-    /* TODO: transportSettings encoding and type to be defined */
-    transportSettings.content.decoded.data       = &ethernettransportSettings;
-    currentWriterGroup->config.transportSettings = transportSettings;
     UA_UInt64 roundOffCycleTime                  = (UA_UInt64)((cycleTimeInMsec * MILLI_SECONDS) - (cycleTimeInMsec * MILLI_SECONDS * pubWakeupPercentage));
 
     while (*runningPub) {
         clock_nanosleep(CLOCKID, TIMER_ABSTIME, &nextnanosleeptime, NULL);
         if (signalTerm == UA_TRUE)
             *runningPub = UA_FALSE;
-        transmission_time                              = ((UA_UInt64)nextnanosleeptime.tv_sec * SECONDS + (UA_UInt64)nextnanosleeptime.tv_nsec) + roundOffCycleTime + (UA_UInt64)(qbvOffset * 1000);
-        ethernettransportSettings.transmission_time = transmission_time;
+
+        transmission_time = (UA_DateTime)(((UA_UInt64)nextnanosleeptime.tv_sec * SECONDS + (UA_UInt64)nextnanosleeptime.tv_nsec) + roundOffCycleTime);
         pubCallback(server, (UA_DateTime)transmission_time, currentWriterGroup);
         nextnanosleeptime.tv_nsec                     += (__syscall_slong_t)interval_ns;
         nanoSecondFieldConversion(&nextnanosleeptime);
@@ -962,7 +953,7 @@ void *subscriber(void *arg) {
     UA_ServerCallback subCallback;
     struct timespec   nextnanosleeptimeSub;
     UA_UInt64         subInterval_ns;
-    UA_UInt64         receive_time;
+    UA_DateTime       receive_time;
 
     threadArg *threadArgumentsSubscriber = (threadArg *)arg;
     server             = threadArgumentsSubscriber->server;
@@ -976,17 +967,20 @@ void *subscriber(void *arg) {
     nextnanosleeptimeSub.tv_sec         += SECONDS_SLEEP;
     nextnanosleeptimeSub.tv_nsec         = (__syscall_slong_t)subWakeupPercentage;
     nanoSecondFieldConversion(&nextnanosleeptimeSub);
+    /* TODO: roundoff required if subwake percentage modified */
     while (*runningSub) {
         /* When blocking socket is disabled, the Subscriber threads wakes up at the start of each cycle */
         if (enableBlockingSocket != UA_TRUE)
             clock_nanosleep(CLOCKID, TIMER_ABSTIME, &nextnanosleeptimeSub, NULL);
-        receive_time = ((UA_UInt64)nextnanosleeptimeSub.tv_sec * SECONDS + (UA_UInt64)nextnanosleeptimeSub.tv_nsec);
+
+        receive_time = ((UA_DateTime)nextnanosleeptimeSub.tv_sec * SECONDS + (UA_DateTime)nextnanosleeptimeSub.tv_nsec);
         /* Read subscribed data from the SubscriberCounter variable */
-        subCallback(server, (UA_DateTime)receive_time, currentReaderGroup);
+        subCallback(server, receive_time, currentReaderGroup);
         if (enableBlockingSocket != UA_TRUE) {
             nextnanosleeptimeSub.tv_nsec += (__syscall_slong_t)subInterval_ns;
             nanoSecondFieldConversion(&nextnanosleeptimeSub);
         }
+
         if (signalTerm == UA_TRUE)
             *runningSub = UA_FALSE;
     }
@@ -996,6 +990,7 @@ void *subscriber(void *arg) {
      * need to be closed by after sending *running=0 for subscriber T8 */
     if (*runningSub == UA_FALSE)
         signalTerm = UA_TRUE;
+
     sleep(1);
     runningServer = UA_FALSE;
 
@@ -1337,7 +1332,7 @@ static void usage(char *appname)
         " -userAppCore     [num]  Run on CPU for userApplication (default %d)\n"
         " -pubMacAddress   [name] Publisher Mac address (default %s - where 8 is the VLAN ID and 3 is the PCP)\n"
         " -subMacAddress   [name] Subscriber Mac address (default %s - where 8 is the VLAN ID and 3 is the PCP)\n"
-        " -qbvOffset       [num]  QBV offset value (default %d)\n"
+        " -qbvOffset       [num]  QBV offset value in milliseconds (default %lf)\n"
         " -disableSoTxtime        Do not use SO_TXTIME\n"
         " -enableCsvLog           Experimental: To log the data in csv files. Support up to 1 million samples\n"
         " -enableLatencyCsvLog    Experimental: To compute and create RTT latency csv. Support up to 1 million samples\n"
@@ -1433,7 +1428,7 @@ int main(int argc, char **argv) {
                 subMacAddress = optarg;
                 break;
             case 'l':
-                qbvOffset = atoi(optarg);
+                qbvOffset = atof(optarg);
                 break;
             case 'm':
                 disableSoTxtime = UA_FALSE;

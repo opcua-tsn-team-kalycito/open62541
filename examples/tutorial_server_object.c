@@ -91,8 +91,8 @@ manuallyDefinePump(UA_Server *server) {
                               UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), modelAttr, NULL, NULL);
 
     UA_VariableAttributes statusAttr = UA_VariableAttributes_default;
-    UA_Boolean status = true;
-    UA_Variant_setScalar(&statusAttr.value, &status, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    UA_Boolean pumpStatus = true;
+    UA_Variant_setScalar(&statusAttr.value, &pumpStatus, &UA_TYPES[UA_TYPES_BOOLEAN]);
     statusAttr.displayName = UA_LOCALIZEDTEXT("en-US", "Status");
     UA_Server_addVariableNode(server, UA_NODEID_NULL, pumpId,
                               UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
@@ -287,9 +287,9 @@ pumpTypeConstructor(UA_Server *server,
         return bpr.statusCode;
 
     /* Set the status value */
-    UA_Boolean status = true;
+    UA_Boolean boolStatus = true;
     UA_Variant value;
-    UA_Variant_setScalar(&value, &status, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    UA_Variant_setScalar(&value, &boolStatus, &UA_TYPES[UA_TYPES_BOOLEAN]);
     UA_Server_writeValue(server, bpr.targets[0].targetId.nodeId, value);
     UA_BrowsePathResult_clear(&bpr);
 

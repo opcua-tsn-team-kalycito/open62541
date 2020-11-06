@@ -11,6 +11,8 @@
 
 _UA_BEGIN_DECLS
 
+void timedUdpPublish(UA_PubSubChannel *channel, UA_DateTime callbackTime, UA_PublishEntry *publishPacket);
+
 UA_PubSubTransportLayer UA_EXPORT
 UA_PubSubTransportLayerUDPMP(void);
 
