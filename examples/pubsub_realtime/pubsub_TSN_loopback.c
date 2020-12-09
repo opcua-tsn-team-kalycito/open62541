@@ -2,25 +2,60 @@
  * See http://creativecommons.org/publicdomain/zero/1.0/ for more information. */
 
 /**
- * **Trace point setup**
+ * .. _pubsub-tutorial:
  *
- *            +--------------+                        +----------------+
- *         T1 | OPCUA PubSub |  T8                 T5 | OPCUA loopback |  T4
- *         |  |  Application |  ^                  |  |  Application   |  ^
- *         |  +--------------+  |                  |  +----------------+  |
- *  User   |  |              |  |                  |  |                |  |
- *  Space  |  |              |  |                  |  |                |  |
- *         |  |              |  |                  |  |                |  |
- *------------|--------------|------------------------|----------------|--------
- *         |  |    Node 1    |  |                  |  |     Node 2     |  |
- *  Kernel |  |              |  |                  |  |                |  |
- *  Space  |  |              |  |                  |  |                |  |
- *         |  |              |  |                  |  |                |  |
- *         v  +--------------+  |                  v  +----------------+  |
- *         T2 |  TX tcpdump  |  T7<----------------T6 |   RX tcpdump   |  T3
- *         |  +--------------+                        +----------------+  ^
- *         |                                                              |
- *         ----------------------------------------------------------------
+ * Realtime Loopback Example
+ * ------------------------
+ *
+ * This tutorial shows publishing and subscribing information in Realtime.
+ * This example has both Publisher and Subscriber(used as threads, running in same core), the Subscriber thread subscribes to the
+ * counterdata published by the Publisher thread of pubsub_TSN_publisher.c example. The subscribed counterdata is again published,
+ * which is subscribed by the Subscriber thread of pubsub_TSN_publisher.c example. Thus a round-trip of counterdata is achieved.
+ * The flow of this communication and the trace points are given in the diagram below.
+ *
+ * Another thread called the UserApplication thread is also used in the example, which serves the functionality of the Control loop.
+ * In this example, UserApplication threads increments the counterData, which is published by the Publisher thread
+ * and also reads the subscribed data from the Information Model and writes the updated counterdata into distinct csv files
+ * during each cycle. Buffered Network Message will be used for publishing and subscribing in the RT path.
+ * Further, DataSetField will be accessed via direct pointer access between the user interface and the Information Model.
+ *
+ * Another additional feature called the Blocking Socket is employed in the Subscriber thread. This feature is optional and can be
+ * enabled or disabled when running application by using command line argument "-enableBlockingSocket". When using Blocking Socket,
+ * the Publisher and Subscriber threads are made to run in different cores, and the Subscriber thread remains in "blocking mode" until
+ * a message is received, in other words the timeout is overwritten and the thread continuously waits for the message.
+ * Once the message is received, the Subscriber thread updates the value in the Information Model and again waits for the next message.
+ * This process is repeated until the application is terminated.
+ *
+ * To ensure realtime capabilities, Publisher uses ETF(Earliest Tx-time First) to publish information at the calculated tranmission
+ * time over Ethernet. Subscriber can be used with or without XDP(Xpress Data Processing) over Ethernet
+ *
+ * Run step of the example is as mentioned below:
+ *
+ * ./bin/examples/pubsub_TSN_loopback -interface <interface>
+ *
+ * For more options, run ./bin/examples/pubsub_TSN_loopback -h
+ */
+
+/**
+ *  Trace point setup
+ *
+ *             +--------------+                        +----------------+
+ *          T1 | OPCUA PubSub |  T8                 T5 | OPCUA loopback |  T4
+ *          |  |  Application |  ^                  |  |  Application   |  ^
+ *          |  +--------------+  |                  |  +----------------+  |
+ *   User   |  |              |  |                  |  |                |  |
+ *   Space  |  |              |  |                  |  |                |  |
+ *          |  |              |  |                  |  |                |  |
+ *  -----------|--------------|------------------------|----------------|--------
+ *          |  |    Node 1    |  |                  |  |     Node 2     |  |
+ *   Kernel |  |              |  |                  |  |                |  |
+ *   Space  |  |              |  |                  |  |                |  |
+ *          |  |              |  |                  |  |                |  |
+ *          v  +--------------+  |                  v  +----------------+  |
+ *          T2 |  TX tcpdump  |  T7<----------------T6 |   RX tcpdump   |  T3
+ *          |  +--------------+                        +----------------+  ^
+ *          |                                                              |
+ *          ----------------------------------------------------------------
  */
 
 #define _GNU_SOURCE
@@ -44,7 +79,7 @@
 #include <open62541/types_generated.h>
 #include <open62541/plugin/pubsub_ethernet.h>
 
-#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP
+#if defined (UA_ENABLE_PUBSUB_ETH_UADP_XDP)
 #include <linux/if_link.h>
 #include <open62541/plugin/pubsub_ethernet_xdp.h>
 #endif
@@ -167,6 +202,18 @@ UA_DataValue        *runningSubDataValueRT =  NULL;
 UA_UInt64           *subRepeatedCounterData[REPEATED_NODECOUNTS] = {NULL};
 UA_DataValue        *subRepeatedDataValueRT[REPEATED_NODECOUNTS] = {NULL};
 
+/**
+ * **CSV file handling**
+ *
+ * csv files are written for Publisher and Subscriber thread.
+ * csv files include the counterdata that is being either Published or Subscribed
+ * along with the timestamp. These csv files can be used to compute latency for following
+ * combinations of Tracepoints, T1-T4 and T1-T8.
+ *
+ * T1-T8 - Gives the Round-trip time of a counterdata, as the value published by the Publisher thread
+ * in pubsub_TSN_publisher.c example is subscribed by the Subscriber thread in pubsub_TSN_loopback.c example and is
+ * published back to the pubsub_TSN_publisher.c example
+ */
 #if defined(PUBLISHER)
 /* File to store the data and timestamps for different traffic */
 FILE               *fpPublisher;
@@ -213,6 +260,8 @@ UA_Duration                  interval_ms;
 UA_UInt64*                   callbackId;
 } threadArg;
 
+/**
+ * Function calls for different threads */
 /* Publisher thread routine for ETF */
 void *publisherETF(void *arg);
 /* Subscriber thread routine */
@@ -239,7 +288,6 @@ static void stopHandler(int sign) {
  * Nanosecond field in timespec is checked for overflowing and one second
  * is added to seconds field and nanosecond field is set to zero
 */
-
 static void nanoSecondFieldConversion(struct timespec *timeSpecValue) {
     /* Check if ns field is greater than '1 ns less than 1sec' */
     while (timeSpecValue->tv_nsec > (SECONDS -1)) {
@@ -250,6 +298,12 @@ static void nanoSecondFieldConversion(struct timespec *timeSpecValue) {
 
 }
 
+/**
+ * **Custom callback handling**
+ *
+ * Custom callback thread handling overwrites the default timer based
+ * callback function with the custom (user-specified) callback interval.
+ */
 /* Add a callback for cyclic repetition */
 static UA_StatusCode
 addPubSubApplicationCallback(UA_Server *server, UA_NodeId identifier,
@@ -306,7 +360,10 @@ removePubSubApplicationCallback(UA_Server *server, UA_NodeId identifier, UA_UInt
 
 }
 
-/* If the external data source is written over the information model, the
+/**
+ * **External data source handling**
+ *
+ * If the external data source is written over the information model, the
  * externalDataWriteCallback will be triggered. The user has to take care and assure
  * that the write leads not to synchronization issues and race conditions. */
 static UA_StatusCode
@@ -327,6 +384,11 @@ externalDataReadNotificationCallback(UA_Server *server, const UA_NodeId *session
     return UA_STATUSCODE_GOOD;
 }
 
+/**
+ * **Subscriber**
+ *
+ * Create connection, readergroup, datasetreader, subscribedvariables for the Subscriber thread.
+ */
 #if defined(SUBSCRIBER)
 static void
 addPubSubConnectionSubscriber(UA_Server *server, UA_NetworkAddressUrlDataType *networkAddressUrlSubscriber){
@@ -337,7 +399,7 @@ addPubSubConnectionSubscriber(UA_Server *server, UA_NetworkAddressUrlDataType *n
     memset(&connectionConfig, 0, sizeof(connectionConfig));
     connectionConfig.name                                   = UA_STRING("Subscriber Connection");
     connectionConfig.enabled                                = UA_TRUE;
-#ifdef UA_ENABLE_PUBSUB_ETH_UADP_XDP
+#if defined (UA_ENABLE_PUBSUB_ETH_UADP_XDP)
     UA_KeyValuePair connectionOptions[2];
     connectionOptions[0].key                  = UA_QUALIFIEDNAME(0, "xdpflag");
     UA_UInt32 flags                           = XDP_FLAG;
@@ -368,6 +430,7 @@ addReaderGroup(UA_Server *server) {
     readerGroupConfig.name    = UA_STRING("ReaderGroup");
     readerGroupConfig.rtLevel = UA_PUBSUB_RT_FIXED_SIZE;
     readerGroupConfig.subscribingInterval = cycleTimeInMsec;
+    /* Timeout is modified when blocking socket is enabled, and the default timeout is used when blocking socket is disabled */
     if (enableBlockingSocket == UA_FALSE)
         readerGroupConfig.timeout = 50;  // As we run in 250us cycle time, modify default timeout (1ms) to 50us
     else {
@@ -562,11 +625,9 @@ addDataSetReader(UA_Server *server) {
 
 #if defined(PUBLISHER)
 /**
- * **PubSub connection handling**
+ * **Publisher**
  *
- * Create a new ConnectionConfig. The addPubSubConnection function takes the
- * config and create a new connection. The Connection identifier is
- * copied to the NodeId parameter.
+ * Create connection, writergroup, datasetwriter and publisheddataset for Publisher thread.
  */
 static void
 addPubSubConnection(UA_Server *server, UA_NetworkAddressUrlDataType *networkAddressUrlPub){
@@ -593,12 +654,7 @@ addPubSubConnection(UA_Server *server, UA_NetworkAddressUrlDataType *networkAddr
     UA_Server_addPubSubConnection(server, &connectionConfig, &connectionIdent);
 }
 
-/**
- * **PublishedDataset handling**
- *
- * Details about the connection configuration and handling are located
- * in the pubsub connection tutorial
- */
+/* PublishedDataset handling */
 static void
 addPublishedDataSet(UA_Server *server) {
     UA_PublishedDataSetConfig publishedDataSetConfig;
@@ -608,12 +664,7 @@ addPublishedDataSet(UA_Server *server) {
     UA_Server_addPublishedDataSet(server, &publishedDataSetConfig, &publishedDataSetIdent);
 }
 
-/**
- * **DataSetField handling**
- *
- * The DataSetField (DSF) is part of the PDS and describes exactly one
- * published field.
- */
+/* DataSetField handling */
 static void
 addDataSetField(UA_Server *server) {
     /* Add a field to the previous created PublishedDataSet */
@@ -726,12 +777,7 @@ addDataSetField(UA_Server *server) {
 
 }
 
-/**
- * **WriterGroup handling**
- *
- * The WriterGroup (WG) is part of the connection and contains the primary
- * configuration parameters for the message creation.
- */
+/* WriterGroup handling */
 static void
 addWriterGroup(UA_Server *server) {
     UA_WriterGroupConfig writerGroupConfig;
@@ -766,13 +812,7 @@ addWriterGroup(UA_Server *server) {
     UA_UadpWriterGroupMessageDataType_delete(writerGroupMessage);
 }
 
-/**
- * **DataSetWriter handling**
- *
- * A DataSetWriter (DSW) is the glue between the WG and the PDS. The DSW is
- * linked to exactly one PDS and contains additional informations for the
- * message generation.
- */
+/* DataSetWriter handling */
 static void
 addDataSetWriter(UA_Server *server) {
     UA_NodeId dataSetWriterIdent;
@@ -813,7 +853,8 @@ updateMeasurementsPublisher(struct timespec start_time,
 #endif
 #if defined(SUBSCRIBER)
 /**
- * Subscribed data handling**
+ * **Subscribed data handling**
+ *
  * The subscribed data is updated in the array using this function Subscribed data handling**
  */
 static void
@@ -839,8 +880,12 @@ updateMeasurementsSubscriber(struct timespec receive_time, UA_UInt64 counterValu
 /**
  * **Publisher thread routine**
  *
+ * This is the Publisher thread that sleeps for 60% of the cycletime (250us) and prepares the tranmission packet within 40% of
+ * cycletime. The priority of this thread is lower than the priority of the Subscriber thread, so the subscriber thread executes first during
+ * every cycle. The data published by this thread in one cycle is subscribed by the subscriber thread of pubsub_TSN_loopback in the next
+ * cycle (two cycle timing model).
+ *
  * The publisherETF function is the routine used by the publisher thread.
- * This routine publishes the data at a cycle time of 100us.
  */
 void *publisherETF(void *arg) {
     struct timespec   nextnanosleeptime;
@@ -900,9 +945,11 @@ void *publisherETF(void *arg) {
 /**
  * **Subscriber thread routine**
  *
+ * This Subscriber thread will wakeup during the start of cycle at 250us interval and check if the packets are received. Subscriber thread has
+ * the highest priority. This Subscriber thread subscribes to the data published by the Publisher thread of pubsub_TSN_loopback in the previous cycle.
  * The subscriber function is the routine used by the subscriber thread.
+ *
  */
-
 void *subscriber(void *arg) {
     UA_Server*        server;
     void*   currentReaderGroup;
@@ -923,6 +970,7 @@ void *subscriber(void *arg) {
     nextnanosleeptimeSub.tv_nsec         = (__syscall_slong_t)subWakeupPercentage;
     nanoSecondFieldConversion(&nextnanosleeptimeSub);
     while (*runningSub) {
+        /* When blocking socket is disabled, the Subscriber threads wakes up at the start of each cycle */
         if (enableBlockingSocket != UA_TRUE)
             clock_nanosleep(CLOCKID, TIMER_ABSTIME, &nextnanosleeptimeSub, NULL);
         /* Read subscribed data from the SubscriberCounter variable */
@@ -947,6 +995,9 @@ void *subscriber(void *arg) {
 /**
  * **UserApplication thread routine**
  *
+ * The userapplication thread will wakeup at 30% of cycle time and handles the userdata(read and write in Information Model).
+ * This thread serves the purpose of a Control loop, which is used to increment the counterdata to be published by the Publisher thread and
+ * read the data from Information Model for the Subscriber thread and writes the updated counterdata in distinct csv files for both threads
  */
 void *userApplicationPubSub(void *arg) {
     struct timespec nextnanosleeptimeUserApplication;
@@ -989,33 +1040,11 @@ void *userApplicationPubSub(void *arg) {
 #endif
 
 /**
- * **Deletion of nodes**
+ * **Thread creation**
  *
- * The removeServerNodes function is used to delete the publisher and subscriber
- * nodes.
+ * The threadcreation functionality creates thread with given threadpriority, coreaffinity. The function returns the threadID of the newly
+ * created thread.
  */
-static void removeServerNodes(UA_Server *server) {
-    /* Delete the Publisher Counter Node*/
-    UA_Server_deleteNode(server, pubNodeID, UA_TRUE);
-    UA_NodeId_clear(&pubNodeID);
-    for (UA_Int32 iterator = 0; iterator < REPEATED_NODECOUNTS; iterator++)
-    {
-        UA_Server_deleteNode(server, pubRepeatedCountNodeID, UA_TRUE);
-        UA_NodeId_clear(&pubRepeatedCountNodeID);
-    }
-    UA_Server_deleteNode(server, runningPubStatusNodeID, UA_TRUE);
-    UA_NodeId_clear(&runningPubStatusNodeID);
-
-    UA_Server_deleteNode(server, subNodeID, UA_TRUE);
-    UA_NodeId_clear(&subNodeID);
-    for (UA_Int32 iterator = 0; iterator < REPEATED_NODECOUNTS; iterator++)
-    {
-        UA_Server_deleteNode(server, subRepeatedCountNodeID, UA_TRUE);
-        UA_NodeId_clear(&subRepeatedCountNodeID);
-    }
-    UA_Server_deleteNode(server, runningSubStatusNodeID, UA_TRUE);
-    UA_NodeId_clear(&runningSubStatusNodeID);
-}
 
 static pthread_t threadCreation(UA_Int16 threadPriority, size_t coreAffinity, void *(*thread) (void *), char *applicationName, \
                                 void *serverConfig){
@@ -1056,8 +1085,10 @@ static pthread_t threadCreation(UA_Int16 threadPriority, size_t coreAffinity, vo
    return threadID;
 
 }
+
 /**
  * **Creation of nodes**
+ *
  * The addServerNodes function is used to create the publisher and subscriber
  * nodes.
  */
@@ -1148,6 +1179,46 @@ static void addServerNodes(UA_Server *server) {
 
 }
 
+/**
+ * **Deletion of nodes**
+ *
+ * The removeServerNodes function is used to delete the publisher and subscriber
+ * nodes.
+ */
+
+static void removeServerNodes(UA_Server *server) {
+    /* Delete the Publisher Counter Node*/
+    UA_Server_deleteNode(server, pubNodeID, UA_TRUE);
+    UA_NodeId_clear(&pubNodeID);
+    for (UA_Int32 iterator = 0; iterator < REPEATED_NODECOUNTS; iterator++)
+    {
+        UA_Server_deleteNode(server, pubRepeatedCountNodeID, UA_TRUE);
+        UA_NodeId_clear(&pubRepeatedCountNodeID);
+    }
+    UA_Server_deleteNode(server, runningPubStatusNodeID, UA_TRUE);
+    UA_NodeId_clear(&runningPubStatusNodeID);
+
+    UA_Server_deleteNode(server, subNodeID, UA_TRUE);
+    UA_NodeId_clear(&subNodeID);
+    for (UA_Int32 iterator = 0; iterator < REPEATED_NODECOUNTS; iterator++)
+    {
+        UA_Server_deleteNode(server, subRepeatedCountNodeID, UA_TRUE);
+        UA_NodeId_clear(&subRepeatedCountNodeID);
+    }
+    UA_Server_deleteNode(server, runningSubStatusNodeID, UA_TRUE);
+    UA_NodeId_clear(&runningSubStatusNodeID);
+}
+
+/**
+ * **Usage function**
+ *
+ * The usage function gives the information to run the application.
+ *
+ * ./bin/examples/pubsub_TSN_loopback -interface <ethernet_interface> runs the application.
+ *
+ * For more options, use ./bin/examples/pubsub_TSN_loopback -h.
+ */
+
 static void usage(char *appname)
 {
     fprintf(stderr,
@@ -1169,7 +1240,8 @@ static void usage(char *appname)
         " -disableSoTxtime        Do not use SO_TXTIME\n"
         " -enableCsvLog           Experimental: To log the data in csv files. Support up to 1 million samples\n"
         " -enableconsolePrint     Experimental: To print the data in console output. Support for higher cycle time\n"
-        " -enableBlockingSocket   Run a application with blocking socket option\n"
+        " -enableBlockingSocket   Run application with blocking socket option. While using blocking socket option need to\n"
+        "                         run both the Publisher and Loopback application. Otherwise application will not terminate.\n"
         "\n",
         appname, DEFAULT_CYCLE_TIME, DEFAULT_SOCKET_PRIORITY, DEFAULT_PUB_SCHED_PRIORITY, \
         DEFAULT_SUB_SCHED_PRIORITY, DEFAULT_USERAPPLICATION_SCHED_PRIORITY, \
@@ -1270,9 +1342,7 @@ int main(int argc, char **argv) {
                 consolePrint = UA_TRUE;
                 break;
             case 'p':
-                /* While using blocking socket option need to run both the Publisher and
-                 * Loopback application. Otherwise application will not exit
-                 * TODO: Application need to be exited independently */
+                /* TODO: Application need to be exited independently */
                 enableBlockingSocket = UA_TRUE;
                 break;
             case 'q':
@@ -1345,7 +1415,6 @@ if (enableCsvLog)
  * The correct factory is selected on runtime by the standard defined
  * PubSub TransportProfileUri's.
  */
-
 #if defined (PUBLISHER)
     config->pubsubTransportLayers[0] = UA_PubSubTransportLayerEthernet();
     config->pubsubTransportLayersSize++;
