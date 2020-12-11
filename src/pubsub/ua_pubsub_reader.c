@@ -950,7 +950,9 @@ UA_ReaderGroup_addSubscribeCallback(UA_Server *server, UA_ReaderGroup *readerGro
         readerGroup->subscribeCallbackIsRegistered = true;
 
     /* Run once after creation */
-    UA_ReaderGroup_subscribeCallback(server, readerGroup);
+    if(readerGroup->config.enableBlockingSocket != UA_TRUE)
+        UA_ReaderGroup_subscribeCallback(server, readerGroup);
+
     return retval;
 }
 
