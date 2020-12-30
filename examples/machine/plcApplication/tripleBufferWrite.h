@@ -23,9 +23,9 @@ void tripleBufferInit(void *shmPointer, int size);
 void writeToBuffer(void* data, int size);
 
 // Pointer to the three buffer addresses
-void *pBuffer[3];
+static void *pBuffer[3];
 
 // tripleBufferRead structure instance
-tripleBufferWrite *pStatus;
+static tripleBufferWrite *pStatus;
 
 #endif
