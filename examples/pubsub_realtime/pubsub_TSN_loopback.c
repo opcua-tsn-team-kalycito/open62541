@@ -996,7 +996,6 @@ void *publisherETF(void *arg) {
             clock_gettime(CLOCKID, &executionendtime);
             timespec_diff(&executionstarttime, &executionendtime, &pubResultime);
         }
-            
 
         /* Calculation of the next wake up time by adding the interval with the previous wake up time */
         nextnanosleeptime.tv_nsec += (__syscall_slong_t)interval_ns;
@@ -1098,7 +1097,7 @@ void *userApplicationPubSub(void *arg) {
     while (*runningSub || *runningPub) {
         /* The User application threads wakes up at the configured userApp wake up percentage (30%) of each cycle */
         clock_nanosleep(CLOCKID, TIMER_ABSTIME, &nextnanosleeptimeUserApplication, NULL);
-        
+
 #if defined(SUBSCRIBER)
         /* Get the time - T4, time where subscribed varibles are read from the Information model.
          * At this point, the packet will be already subscribed and written into the
@@ -1123,8 +1122,9 @@ void *userApplicationPubSub(void *arg) {
 #endif
 
         if(enableLongRunMeas) {
-if(*pubCounterData > 0)
-            updateLRMeasurementsPublisherlb(pubResultime, userResultime);
+            if(*pubCounterData > 0)
+                updateLRMeasurementsPublisherlb(pubResultime, userResultime);
+        }
 
         if (enableCsvLog || consolePrint) {
 #if defined(SUBSCRIBER)
