@@ -13,6 +13,8 @@
 
 #include "server/ua_server_internal.h"
 
+#include "time.h"
+
 #ifdef UA_ENABLE_PUBSUB /* conditional compilation */
 
 #include "ua_pubsub.h"
@@ -31,11 +33,19 @@
 #include "ua_pubsub_bufmalloc.h"
 #endif
 
+#ifndef CLOCK_TAI
+#define             CLOCK_TAI                               11
+#endif
+#define             CLOCKID                                 CLOCK_TAI
+
 #define UA_MAX_SIZENAME           64  /* Max size of Qualified Name of Subscribed Variable */
 #define MIN_PAYLOAD_SIZE_ETHERNET 46
 
 #define RECEIVE_MSG_BUFFER_SIZE   4096
 static UA_THREAD_LOCAL UA_Byte ReceiveMsgBuffer[RECEIVE_MSG_BUFFER_SIZE];
+
+extern struct timespec subDataProcessResultime;
+struct timespec subscriberDataProcessStartTime;
 
 /* Clear ReaderGroup */
 static void
@@ -43,6 +53,26 @@ UA_Server_ReaderGroup_clear(UA_Server* server, UA_ReaderGroup *readerGroup);
 /* Clear DataSetReader */
 static void
 UA_DataSetReader_clear(UA_Server *server, UA_DataSetReader *dataSetReader);
+
+/**
+ * **Time Difference Calculation**
+ *
+ * This function is used to calculate the difference between the publishertimestamp and
+ * subscribertimestamp and store the result
+ */
+static void
+timespec_diff(struct timespec *start, struct timespec *stop, struct timespec *result)
+{
+    if ((stop->tv_nsec - start->tv_nsec) < 0) {
+        result->tv_sec = stop->tv_sec - start->tv_sec - 1;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
+    } else {
+        result->tv_sec = stop->tv_sec - start->tv_sec;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec;
+    }
+
+    return;
+}
 
 static void
 UA_PubSubDSRDataSetField_sampleValue(UA_Server *server, UA_DataSetReader *dataSetReader,
@@ -941,6 +971,7 @@ void UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_ReaderGroup *readerG
     if(buffer.length > 0) {
         size_t currentPosition = 0;
         size_t previousPosition = 0;
+        struct timespec subscriberDataProcessEndTime;
         if (readerGroup->config.rtLevel == UA_PUBSUB_RT_FIXED_SIZE) {
             do {
 #ifdef UA_ENABLE_PUBSUB_BUFMALLOC
@@ -998,6 +1029,8 @@ void UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_ReaderGroup *readerG
                 previousPosition = currentPosition;
             } while((buffer.length) > currentPosition);
 
+            clock_gettime(CLOCKID, &subscriberDataProcessEndTime);
+            timespec_diff(&subscriberDataProcessStartTime, &subscriberDataProcessEndTime, &subDataProcessResultime);
             return;
 
         } else {
