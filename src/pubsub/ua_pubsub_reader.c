@@ -44,7 +44,7 @@
 #define RECEIVE_MSG_BUFFER_SIZE   4096
 static UA_THREAD_LOCAL UA_Byte ReceiveMsgBuffer[RECEIVE_MSG_BUFFER_SIZE];
 
-extern struct timespec subDataProcessResultime;
+struct timespec subDataProcessResultime;
 struct timespec subscriberDataProcessStartTime;
 
 /* Clear ReaderGroup */

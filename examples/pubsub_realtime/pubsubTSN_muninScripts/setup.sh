@@ -49,8 +49,8 @@ Help()
     echo "Usage: $0 -i <interface_name> -d <directory_name>"
     echo Options:
     echo "-i     i210 interface name"
-    echo "-d     directory where the latency csv files of PubSub application \
-are generated (Provide absolute path)"
+    echo "-d     provide the absolute path of PubSub application build directory"
+    echo "eg.,   ./setup.sh -i enp2s0 -d /home/sysadmin/open62541/build"
 }
 
 ###############################################################################
@@ -106,10 +106,6 @@ main()
     #open62541_countermiss_at_subscriber_compute - find the number of packets missed at the user layer of subscriber threads in pubsub applications
     #The values are stored and updated in txt files for every 5 minutes
     #From this txt file, Munin scripts will take values to plot in the graph
-    sed -i "/GENLATENCYDIR=/c GENLATENCYDIR=$DIRECTORY_NAME" \
-        scripts/open62541_latency_script
-    sed -i "/GENLATENCYDIR=/c GENLATENCYDIR=$DIRECTORY_NAME" \
-        scripts/open62541_loopback_latency_script
     sed -i "/GENLATENCYDIR=/c GENLATENCYDIR=$DIRECTORY_NAME" \
         scripts/open62541_countermiss_at_subscriber_compute
 
