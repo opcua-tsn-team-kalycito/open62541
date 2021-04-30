@@ -38,7 +38,7 @@
 #endif
 #define             CLOCKID                                 CLOCK_TAI
 
-extern struct timespec subDataProcessResultime;
+struct timespec subDataProcessResultime;
 struct timespec subscriberDataProcessStartTime;
 
 /* Clear ReaderGroup */
