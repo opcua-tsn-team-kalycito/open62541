@@ -206,6 +206,12 @@ struct UA_PubSubConfiguration {
     UA_PubSubSecurityPolicy *securityPolicies;
 #endif
 
+#ifdef UA_ENABLE_PUBSUB_ENCRYPTION_TPM
+    /* PubSub security policies */
+    size_t securityPoliciesSizeTPM;
+    UA_PubSubSecurityPolicyTPM *securityPoliciesTPM;
+#endif
+
 #ifdef UA_ENABLE_PUBSUB_MONITORING
     UA_PubSubMonitoringInterface monitoringInterface;
 #endif
@@ -490,6 +496,9 @@ typedef struct {
     UA_MessageSecurityMode securityMode; /* via the UA_WriterGroupDataType */
 #ifdef UA_ENABLE_PUBSUB_ENCRYPTION
     UA_PubSubSecurityPolicy *securityPolicy;
+#endif
+#ifdef UA_ENABLE_PUBSUB_ENCRYPTION_TPM
+    UA_PubSubSecurityPolicyTPM *securityPolicyTPM;
 #endif
 } UA_WriterGroupConfig;
 
