@@ -2039,6 +2039,14 @@ generateNetworkMessage(UA_PubSubConnection *connection, UA_WriterGroup *wg,
     }
 #endif
 
+    /* Set the SecurityHeader */
+#ifdef UA_ENABLE_PUBSUB_ENCRYPTION_TPM
+    networkMessage->securityEnabled = true;
+    networkMessage->securityHeader.networkMessageSigned = true;
+    if(wg->config.securityMode >= UA_MESSAGESECURITYMODE_SIGNANDENCRYPT)
+        networkMessage->securityHeader.networkMessageEncrypted = true;
+#endif
+
     networkMessage->version = 1;
     networkMessage->networkMessageType = UA_NETWORKMESSAGE_DATASET;
     if(connection->config->publisherIdType == UA_PUBSUB_PUBLISHERID_NUMERIC) {
@@ -2119,6 +2127,27 @@ encryptAndSign(UA_WriterGroup *wg, const UA_NetworkMessage *nm,
 }
 #endif
 
+#ifdef UA_ENABLE_PUBSUB_ENCRYPTION_TPM
+static UA_StatusCode
+encryptAndSignTPM(UA_WriterGroup *wg, const UA_NetworkMessage *nm, UA_Byte *encryptStart, UA_Byte *msgEnd) {
+    UA_StatusCode rv;
+
+    if(nm->securityHeader.networkMessageSigned) {
+        /* To be implemented */
+    }
+
+    if(nm->securityHeader.networkMessageEncrypted) {
+        /* The encryption is done in-place, no need to encode again */
+        UA_ByteString toBeEncrypted = {(uintptr_t)msgEnd - (uintptr_t)encryptStart,
+                                       encryptStart};
+        rv = wg->config.securityPolicyTPM->encryptTPM(wg->config.securityPolicyTPM, wg->config.securityPolicyTPM->session,
+                                                      wg->config.securityPolicyTPM->key, &toBeEncrypted);
+        UA_CHECK_STATUS(rv, return rv);
+    }
+    return UA_STATUSCODE_GOOD;
+}
+#endif
+
 static UA_StatusCode
 writeNetworkMessage(UA_WriterGroup *wg, size_t msgSize,
                     UA_NetworkMessage *nm, UA_ByteString *buf) { /* Encode the message */
@@ -2132,7 +2161,7 @@ writeNetworkMessage(UA_WriterGroup *wg, size_t msgSize,
     UA_StatusCode rv = UA_NetworkMessage_encodeHeaders(nm, &bufPos, bufEnd);
     UA_CHECK_STATUS(rv, return rv);
 
-#ifdef UA_ENABLE_PUBSUB_ENCRYPTION
+#if defined(UA_ENABLE_PUBSUB_ENCRYPTION) || defined(UA_ENABLE_PUBSUB_ENCRYPTION_TPM)
     UA_Byte *payloadStart = bufPos;
 #endif
     rv = UA_NetworkMessage_encodePayload(nm, &bufPos, bufEnd);
@@ -2141,13 +2170,19 @@ writeNetworkMessage(UA_WriterGroup *wg, size_t msgSize,
     rv = UA_NetworkMessage_encodeFooters(nm, &bufPos, bufEnd);
     UA_CHECK_STATUS(rv, return rv);
 
-#ifdef UA_ENABLE_PUBSUB_ENCRYPTION
+#if defined(UA_ENABLE_PUBSUB_ENCRYPTION) || defined(UA_ENABLE_PUBSUB_ENCRYPTION_TPM)
     UA_Byte *footerEnd = bufPos;
 #endif
     /* Encrypt and Sign the message */
 #ifdef UA_ENABLE_PUBSUB_ENCRYPTION
 
     rv = encryptAndSign(wg, nm, networkMessageStart, payloadStart, footerEnd);
+    UA_CHECK_STATUS(rv, return rv);
+
+#endif
+#ifdef UA_ENABLE_PUBSUB_ENCRYPTION_TPM
+
+    rv = encryptAndSignTPM(wg, nm, payloadStart, footerEnd);
     UA_CHECK_STATUS(rv, return rv);
 
 #endif
