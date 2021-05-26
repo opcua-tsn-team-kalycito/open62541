@@ -4,7 +4,7 @@
  *
  * Copyright (c) 2017-2019 Fraunhofer IOSB (Author: Andreas Ebner)
  * Copyright (c) 2019 Fraunhofer IOSB (Author: Julius Pfrommer)
- * Copyright (c) 2019 Kalycito Infotech Private Limited
+ * Copyright (c) 2019-2021 Kalycito Infotech Private Limited
  * Copyright (c) 2020 Yannick Wallerer, Siemens AG
  * Copyright (c) 2020 Thomas Fischer, Siemens AG
  * Copyright (c) 2021 Fraunhofer IOSB (Author: Jan Hermes)
@@ -2042,7 +2042,7 @@ generateNetworkMessage(UA_PubSubConnection *connection, UA_WriterGroup *wg,
     /* Set the SecurityHeader */
 #ifdef UA_ENABLE_PUBSUB_ENCRYPTION_TPM
     networkMessage->securityEnabled = true;
-    networkMessage->securityHeader.networkMessageSigned = true;
+    networkMessage->securityHeader.networkMessageSigned = false;
     if(wg->config.securityMode >= UA_MESSAGESECURITYMODE_SIGNANDENCRYPT)
         networkMessage->securityHeader.networkMessageEncrypted = true;
 #endif
@@ -2129,12 +2129,8 @@ encryptAndSign(UA_WriterGroup *wg, const UA_NetworkMessage *nm,
 
 #ifdef UA_ENABLE_PUBSUB_ENCRYPTION_TPM
 static UA_StatusCode
-encryptAndSignTPM(UA_WriterGroup *wg, const UA_NetworkMessage *nm, UA_Byte *encryptStart, UA_Byte *msgEnd) {
+encryptTPM(UA_WriterGroup *wg, const UA_NetworkMessage *nm, UA_Byte *encryptStart, UA_Byte *msgEnd) {
     UA_StatusCode rv;
-
-    if(nm->securityHeader.networkMessageSigned) {
-        /* To be implemented */
-    }
 
     if(nm->securityHeader.networkMessageEncrypted) {
         /* The encryption is done in-place, no need to encode again */
@@ -2182,7 +2178,7 @@ writeNetworkMessage(UA_WriterGroup *wg, size_t msgSize,
 #endif
 #ifdef UA_ENABLE_PUBSUB_ENCRYPTION_TPM
 
-    rv = encryptAndSignTPM(wg, nm, payloadStart, footerEnd);
+    rv = encryptTPM(wg, nm, payloadStart, footerEnd);
     UA_CHECK_STATUS(rv, return rv);
 
 #endif
