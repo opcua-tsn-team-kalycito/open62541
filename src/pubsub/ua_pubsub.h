@@ -154,7 +154,7 @@ struct UA_WriterGroup{
     /* This flag is 'read only' and is set internally based on the PubSub state. */
     UA_Boolean configurationFrozen;
 
-#if defined(UA_ENABLE_PUBSUB_ENCRYPTION) || defined(UA_ENABLE_PUBSUB_ENCRYPTION_TPM)
+#ifdef UA_ENABLE_PUBSUB_ENCRYPTION
     UA_UInt32 securityTokenId;
     UA_UInt32 nonceSequenceNumber; /* To be part of the MessageNonce */
     void *securityPolicyContext;
