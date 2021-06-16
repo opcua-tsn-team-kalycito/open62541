@@ -13,8 +13,6 @@
 
 #include "server/ua_server_internal.h"
 
-#include "time.h"
-
 #ifdef UA_ENABLE_PUBSUB /* conditional compilation */
 
 #include "ua_pubsub.h"
@@ -33,6 +31,8 @@
 #include "ua_pubsub_bufmalloc.h"
 #endif
 
+#ifdef UA_ARCHITECTURE_POSIX
+#include <time.h>
 #ifndef CLOCK_TAI
 #define             CLOCK_TAI                               11
 #endif
@@ -40,6 +40,7 @@
 
 struct timespec subDataProcessResultime;
 struct timespec subscriberDataProcessStartTime;
+#endif
 
 /* Clear ReaderGroup */
 static void
@@ -54,6 +55,7 @@ UA_DataSetReader_clear(UA_Server *server, UA_DataSetReader *dataSetReader);
  * This function is used to calculate the difference between the publishertimestamp and
  * subscribertimestamp and store the result
  */
+#ifdef UA_ARCHITECTURE_POSIX
 static void
 timespec_diff(struct timespec *start, struct timespec *stop, struct timespec *result)
 {
@@ -67,6 +69,7 @@ timespec_diff(struct timespec *start, struct timespec *stop, struct timespec *re
 
     return;
 }
+#endif
 
 static void
 UA_PubSubDSRDataSetField_sampleValue(UA_Server *server, UA_DataSetReader *dataSetReader,
@@ -1933,6 +1936,11 @@ decodeAndProcessNetworkMessageRT(UA_Server *server, UA_ReaderGroup *readerGroup,
         (*currentPosition) += paddingBytes; /* During multiple receive, move the position
                                                to handle padding bytes */
     }
+#ifdef UA_ARCHITECTURE_POSIX
+    struct timespec subscriberDataProcessEndTime;
+    clock_gettime(CLOCKID, &subscriberDataProcessEndTime);
+    timespec_diff(&subscriberDataProcessStartTime, &subscriberDataProcessEndTime, &subDataProcessResultime);
+#endif
     return UA_STATUSCODE_GOOD;
 }
 
