@@ -471,8 +471,13 @@ UA_Server_unfreezeWriterGroupConfiguration(UA_Server *server,
     if(wg->config.rtLevel == UA_PUBSUB_RT_FIXED_SIZE) {
         UA_ByteString_clear(&wg->bufferedMessage.buffer);
 #ifdef UA_ENABLE_PUBSUB_ENCRYPTION
-        UA_free(wg->bufferedMessage.nm);
-        UA_ByteString_clear(&wg->bufferedMessage.encryptBuffer);
+        if (wg->config.securityMode > UA_MESSAGESECURITYMODE_NONE) {
+            if (wg->bufferedMessage.nm != NULL) {
+                UA_ByteString_clear(&wg->bufferedMessage.nm->securityHeader.messageNonce);
+                UA_free(wg->bufferedMessage.nm);
+            }
+            UA_ByteString_clear(&wg->bufferedMessage.encryptBuffer);
+        }
 #endif
     }
 
@@ -2183,27 +2188,26 @@ sendBufferedNetworkMessage(UA_Server *server, UA_WriterGroup *writerGroup,
                      "PubSub sending. Unknown field type.");
     UA_PubSubConnection *connection = writerGroup->linkedConnection;
 #ifdef UA_ENABLE_PUBSUB_ENCRYPTION
-    void *channelContext = writerGroup->securityPolicyContext;
-    size_t sigSize = writerGroup->config.securityPolicy->symmetricModule.cryptoModule.
-                        signatureAlgorithm.getLocalSignatureSize(channelContext);
-    UA_NetworkMessage *nm        = buffer->nm;
-    UA_Byte *networkMessageStart = buffer->buffer.data;
-    UA_Byte *payloadPosition     = buffer->payloadPosition;
-    UA_Byte payloadOffset        = (UA_Byte)(payloadPosition - networkMessageStart);
-    memcpy(buffer->encryptBuffer.data,  buffer->buffer.data, buffer->buffer.length);
-    UA_Byte *networkMessageStart1 = buffer->encryptBuffer.data;
-    UA_Byte *payloadPosition1 =  buffer->encryptBuffer.data + payloadOffset;
-    UA_Byte *footerEnd = buffer->encryptBuffer.data +  buffer->encryptBuffer.length - sigSize;
-    UA_StatusCode rv = encryptAndSign(writerGroup, nm, networkMessageStart1, payloadPosition1, footerEnd);
-    UA_CHECK_STATUS(rv, return rv);
+    if (writerGroup->config.securityMode > UA_MESSAGESECURITYMODE_NONE) {
+        void *channelContext = writerGroup->securityPolicyContext;
+        size_t sigSize = writerGroup->config.securityPolicy->symmetricModule.cryptoModule.
+                            signatureAlgorithm.getLocalSignatureSize(channelContext);
+        UA_NetworkMessage *nm        = buffer->nm;
+        UA_Byte *networkMessageStart = buffer->buffer.data;
+        UA_Byte *payloadPosition     = buffer->payloadPosition;
+        UA_Byte payloadOffset        = (UA_Byte)(payloadPosition - networkMessageStart);
+        memcpy(buffer->encryptBuffer.data,  buffer->buffer.data, buffer->buffer.length);
+        UA_Byte *networkMessageStart1 = buffer->encryptBuffer.data;
+        UA_Byte *payloadPosition1 =  buffer->encryptBuffer.data + payloadOffset;
+        UA_Byte *footerEnd = buffer->encryptBuffer.data +  buffer->encryptBuffer.length - sigSize;
+        UA_StatusCode rv = encryptAndSign(writerGroup, nm, networkMessageStart1, payloadPosition1, footerEnd);
+        UA_CHECK_STATUS(rv, return rv);
+        return connection->channel->send(connection->channel,
+                                        transportSettings, &buffer->encryptBuffer);
+    }
 #endif
-#ifdef UA_ENABLE_PUBSUB_ENCRYPTION
-    return connection->channel->send(connection->channel,
-                                     transportSettings, &buffer->encryptBuffer);
-#else
     return connection->channel->send(connection->channel,
                                      transportSettings, &buffer->buffer);
-#endif
 }
 
 #ifdef UA_ENABLE_PUBSUB_ENCRYPTION

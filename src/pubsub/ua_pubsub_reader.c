@@ -1922,22 +1922,25 @@ decodeAndProcessNetworkMessageRT(UA_Server *server, UA_ReaderGroup *readerGroup,
     size_t paddingBytes = 0;
     UA_DataSetReader *dataSetReader = LIST_FIRST(&readerGroup->readers);
 #ifdef UA_ENABLE_PUBSUB_ENCRYPTION
-    UA_NetworkMessage currentNetworkMessage;
-    memset(&currentNetworkMessage, 0, sizeof(UA_NetworkMessage));
-    UA_StatusCode rv;
-    size_t payLoadPosition = 0;
-     rv = UA_NetworkMessage_decodeHeaders(
-          buffer, &payLoadPosition, &currentNetworkMessage);
+    if(readerGroup->config.securityMode > UA_MESSAGESECURITYMODE_NONE) {
+        UA_NetworkMessage currentNetworkMessage;
+        memset(&currentNetworkMessage, 0, sizeof(UA_NetworkMessage));
+        UA_StatusCode rv;
+        size_t payLoadPosition = 0;
+        rv = UA_NetworkMessage_decodeHeaders(
+            buffer, &payLoadPosition, &currentNetworkMessage);
 
-    UA_CHECK_STATUS_ERROR(rv, return rv, &server->config.logger, UA_LOGCATEGORY_SERVER,
-                          "PubSub receive. decoding headers failed");
-    rv = verifyAndDecryptNetworkMessage(&server->config.logger,
-                                        buffer,
-                                        &payLoadPosition,
-                                        &currentNetworkMessage,
-                                        readerGroup);
-    UA_CHECK_STATUS_WARN(rv, return rv, &server->config.logger, UA_LOGCATEGORY_SERVER,
-                         "Subscribe failed. verify and decrypt network message failed.");
+        UA_CHECK_STATUS_ERROR(rv, return rv, &server->config.logger, UA_LOGCATEGORY_SERVER,
+                            "PubSub receive. decoding headers failed");
+        rv = verifyAndDecryptNetworkMessage(&server->config.logger,
+                                            buffer,
+                                            &payLoadPosition,
+                                            &currentNetworkMessage,
+                                            readerGroup);
+        UA_CHECK_STATUS_WARN(rv, return rv, &server->config.logger, UA_LOGCATEGORY_SERVER,
+                            "Subscribe failed. verify and decrypt network message failed.");
+        UA_NetworkMessage_clear(&currentNetworkMessage);
+    }
 #endif
     /* Decode only the necessary offset and update the networkMessage */
     if(UA_NetworkMessage_updateBufferedNwMessage(&dataSetReader->bufferedMessage, buffer,
