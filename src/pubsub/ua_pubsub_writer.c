@@ -409,8 +409,10 @@ UA_Server_freezeWriterGroupConfiguration(UA_Server *server,
         wg->bufferedMessage.nm->securityHeader.networkMessageEncrypted = networkMessage.securityHeader.networkMessageEncrypted;
         wg->bufferedMessage.nm->securityHeader.networkMessageSigned = networkMessage.securityHeader.networkMessageSigned;
         UA_ByteString_copy(&networkMessage.securityHeader.messageNonce, &wg->bufferedMessage.nm->securityHeader.messageNonce);
-        UA_ByteString_allocBuffer(&wg->bufferedMessage.encryptBuffer, msgSize);
         UA_ByteString_clear(&networkMessage.securityHeader.messageNonce);
+        res = UA_ByteString_allocBuffer(&wg->bufferedMessage.encryptBuffer, msgSize);
+        if(res != UA_STATUSCODE_GOOD)
+            goto cleanup;
     }
 #endif
     if (wg->config.securityMode <= UA_MESSAGESECURITYMODE_NONE)
